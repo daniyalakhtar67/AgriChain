@@ -2,7 +2,7 @@ import 'package:argichain/screens/welcome.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:ui';
-import 'dart:async'; //
+import 'dart:async';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -16,7 +16,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Timer(Duration(seconds: 4), () {
+    Timer(Duration(seconds: 5), () {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => WelcomeScreen()),
@@ -111,7 +111,6 @@ class _SplashScreenState extends State<SplashScreen> {
               ],
             ),
 
-            // Loading bilkul neeche
             Padding(
               padding: EdgeInsets.only(bottom: 50),
               child: Column(
