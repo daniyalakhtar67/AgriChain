@@ -41,7 +41,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         text: TextSpan(
                           text: 'WELCOME TO ',
                           style: GoogleFonts.montserrat(
-                            fontSize: 30,
+                            fontSize: 26,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
@@ -87,7 +87,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       minimumSize: Size(280, 58),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                     ),
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ShopkepperLogin(),)),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ShopkeeperLogin(),)),
                   ),
 
                   SizedBox(height: 16),
@@ -106,7 +106,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 ],
               ),
 
-              // NOTES
               Padding(
                 padding: EdgeInsets.only(bottom: 20, left: 16, right: 16),
                 child: ClipRRect(
