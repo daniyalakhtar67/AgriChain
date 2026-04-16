@@ -3,10 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:ui';
-import 'package:argichain/database_service.dart';
 import 'package:argichain/screens/buyer/buyer_register.dart';
 import 'package:argichain/screens/buyer/buyer_dashboard.dart';
-import 'package:flutter/services.dart';
 class BuyerLogin extends StatefulWidget {
   const BuyerLogin({super.key});
   @override
