@@ -1,6 +1,5 @@
 import 'package:argichain/reuseable/Login_reuseable.dart';
 import 'package:flutter/material.dart';
-import 'package:argichain/reuseable/login_reusable.dart';
 import 'package:argichain/screens/shopkeeper/shopkeeper_register.dart';
 import 'package:argichain/screens/shopkeeper/shopkeeper_dashboard.dart';
 
@@ -11,10 +10,10 @@ class ShopkeeperLogin extends StatelessWidget {
   Widget build(BuildContext context) {
     return ReusableLogin(
       title: "Shopkeeper",
-      imagePath: "assets/images/Shop.jpg",
+      imagePath: "assets/images/SH.avif",
       registerPage: const ShopkeeperRegister(),
       dashboardPage:  ShopkeeperDashboard(shopkeeperName: 'Daniyal'),
-      role: "shopkeeper", // 🔥 ADDED
+      role: "shopkeeper",
     );
   }
 }

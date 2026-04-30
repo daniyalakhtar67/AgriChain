@@ -51,7 +51,6 @@ class _FarmerRegisterState extends State<FarmerRegister> {
     super.dispose();
   }
 
-  // ── Supabase DB Logic ────────────────────────────────────────────────────────
   Future<void> _register() async {
     final name    = _nameController.text.trim();
     final cnic    = _cnicController.text.trim();
@@ -78,7 +77,6 @@ class _FarmerRegisterState extends State<FarmerRegister> {
     setState(() => _isLoading = true);
 
     try {
-      // Check duplicate CNIC
       final existing = await Supabase.instance.client
           .from('farmers')
           .select()
@@ -90,7 +88,6 @@ class _FarmerRegisterState extends State<FarmerRegister> {
         return;
       }
 
-      // Insert — columns match exact SQL schema
       await Supabase.instance.client.from('farmers').insert({
         'full_name'    : name,
         'cnic'         : cnic,
@@ -122,7 +119,6 @@ class _FarmerRegisterState extends State<FarmerRegister> {
     );
   }
 
-  // ── UI ───────────────────────────────────────────────────────────────────────
   Widget _buildField({
     required String label,
     required TextEditingController controller,
@@ -176,11 +172,17 @@ class _FarmerRegisterState extends State<FarmerRegister> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.green.shade800,
+        backgroundColor: Colors.green,
         centerTitle: true,
-        title: Text(
-          'AgriChain',
-          style: GoogleFonts.montserrat(fontWeight: FontWeight.bold, color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: RichText(
+          text: TextSpan(
+            style: GoogleFonts.montserrat(fontSize: 22, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic),
+            children: const [
+              TextSpan(text: 'Agri',  style: TextStyle(color: Colors.white)),
+              TextSpan(text: 'Chain', style: TextStyle(color: Colors.yellow)),
+            ],
+          ),
         ),
       ),
       body: Container(

@@ -51,7 +51,6 @@ class _ShopkeeperRegisterState extends State<ShopkeeperRegister> {
     super.dispose();
   }
 
-  // ── Supabase DB Logic ────────────────────────────────────────────────────────
   Future<void> _register() async {
     final name  = _nameController.text.trim();
     final cnic  = _cnicController.text.trim();
@@ -122,16 +121,16 @@ class _ShopkeeperRegisterState extends State<ShopkeeperRegister> {
     );
   }
 
-  // ── UI ───────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.green.shade900,
+        backgroundColor: Colors.green,
         centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
         title: RichText(
           text: TextSpan(
-            style: GoogleFonts.montserrat(fontSize: 20, fontWeight: FontWeight.bold),
+            style: GoogleFonts.montserrat(fontSize: 22, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic),
             children: const [
               TextSpan(text: 'Agri',  style: TextStyle(color: Colors.white)),
               TextSpan(text: 'Chain', style: TextStyle(color: Colors.yellow)),
@@ -162,7 +161,6 @@ class _ShopkeeperRegisterState extends State<ShopkeeperRegister> {
                 style: GoogleFonts.poppins(fontSize: 14, color: Colors.white70),
               ),
               const SizedBox(height: 25),
-
               ClipRRect(
                 borderRadius: BorderRadius.circular(20),
                 child: BackdropFilter(

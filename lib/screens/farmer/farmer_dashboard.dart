@@ -115,9 +115,6 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
     );
   }
 
-  // ─────────────────────────────────────────
-  // BUY ITEMS TAB
-  // ─────────────────────────────────────────
   Widget _buildBuyItems() {
     return Stack(
       children: [

@@ -1,6 +1,5 @@
 import 'package:argichain/reuseable/Login_reuseable.dart';
 import 'package:flutter/material.dart';
-import 'package:argichain/reuseable/login_reusable.dart';
 import 'package:argichain/screens/buyer/buyer_register.dart';
 import 'package:argichain/screens/buyer/buyer_dashboard.dart';
 
@@ -11,10 +10,10 @@ class BuyerLogin extends StatelessWidget {
   Widget build(BuildContext context) {
     return ReusableLogin(
       title: "Buyer",
-      imagePath: "assets/images/Buyer_bg.jpg",
+      imagePath: "assets/images/B_BG.avif",
       registerPage: const BuyerRegister(),
       dashboardPage: BuyerDashboard(buyerName: 'Daniyal'),
-      role: "buyer", // 🔥 ADDED
+      role: "buyer",
     );
   }
 }

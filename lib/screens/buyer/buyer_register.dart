@@ -47,7 +47,6 @@ class _BuyerRegisterState extends State<BuyerRegister> {
     super.dispose();
   }
 
-  // ── Supabase DB Logic ────────────────────────────────────────────────────────
   Future<void> _register() async {
     final name    = _nameController.text.trim();
     final cnic    = _cnicController.text.trim();
@@ -71,7 +70,6 @@ class _BuyerRegisterState extends State<BuyerRegister> {
     setState(() => _isLoading = true);
 
     try {
-      // Check duplicate CNIC
       final existing = await Supabase.instance.client
           .from('buyers')
           .select()
@@ -83,7 +81,6 @@ class _BuyerRegisterState extends State<BuyerRegister> {
         return;
       }
 
-      // Insert — columns match exact SQL schema
       await Supabase.instance.client.from('buyers').insert({
         'full_name': name,
         'cnic'     : cnic,
@@ -113,7 +110,6 @@ class _BuyerRegisterState extends State<BuyerRegister> {
     );
   }
 
-  // ── UI ───────────────────────────────────────────────────────────────────────
   Widget _buildField(
       String label,
       TextEditingController controller,
@@ -160,11 +156,12 @@ class _BuyerRegisterState extends State<BuyerRegister> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.green.shade900,
+        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: Colors.green,
         centerTitle: true,
         title: RichText(
           text: TextSpan(
-            style: GoogleFonts.montserrat(fontSize: 22, fontWeight: FontWeight.bold),
+            style: GoogleFonts.montserrat(fontSize: 22, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic),
             children: const [
               TextSpan(text: 'Agri',  style: TextStyle(color: Colors.white)),
               TextSpan(text: 'Chain', style: TextStyle(color: Colors.yellow)),

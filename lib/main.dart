@@ -1,10 +1,5 @@
-import 'package:argichain/screens/buyer/buyer_dashboard.dart';
 import 'package:argichain/screens/buyer/buyer_register.dart';
-import 'package:argichain/screens/farmer/farmer_dashboard.dart';
 import 'package:argichain/screens/farmer/farmer_login.dart';
-import 'package:argichain/screens/shopkeeper/shopkeeper_dashboard.dart';
-import 'package:argichain/screens/shopkeeper/shopkeeper_register.dart';
-import 'package:argichain/screens/splash_screen.dart';
 import 'package:argichain/screens/welcome.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -31,7 +26,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.green,
       ),
-      home: SplashScreen(),
+      home: WelcomeScreen(),
       routes: {
         '/welcome': (context) => const WelcomeScreen(),
         '/buyerRegister': (context) => const BuyerRegister(),

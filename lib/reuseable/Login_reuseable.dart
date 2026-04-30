@@ -79,7 +79,7 @@ class _ReusableLoginState extends State<ReusableLogin> {
             MaterialPageRoute(builder: (_) => FarmerDashboard(farmerName: name)));
       } else if (widget.role == 'buyer') {
         Navigator.pushReplacement(context,
-            MaterialPageRoute(builder: (_) => BuyerDashboard(buyerName: "Daniyal")));
+            MaterialPageRoute(builder: (_) => BuyerDashboard(buyerName: name)));
       } else if (widget.role == 'shopkeeper') {
         Navigator.pushReplacement(context,
             MaterialPageRoute(builder: (_) => ShopkeeperDashboard(shopkeeperName: name)));
@@ -137,6 +137,7 @@ class _ReusableLoginState extends State<ReusableLogin> {
           image: DecorationImage(
             image: AssetImage(widget.imagePath),
             fit: BoxFit.cover,
+            filterQuality: FilterQuality.high, // ✅ ADDED
           ),
         ),
         child: SingleChildScrollView(
@@ -178,14 +179,23 @@ class _ReusableLoginState extends State<ReusableLogin> {
                               keyboardType: TextInputType.number,
                               maxLength: 15,
                               inputFormatters: [CnicFormatter()],
-                              style: GoogleFonts.poppins(fontSize: 16, color: Colors.white),
+                              style: GoogleFonts.poppins(
+                                  fontSize: 16, color: Colors.white),
                               decoration: InputDecoration(
                                 hintText: '12345-1234567-1',
-                                counterStyle: const TextStyle(color: Colors.white60),
-                                hintStyle: GoogleFonts.poppins(fontSize: 16, color: Colors.white60),
+                                counterStyle: const TextStyle(
+                                    color: Colors.white60),
+                                hintStyle: GoogleFonts.poppins(
+                                    fontSize: 16, color: Colors.white60),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(color: Colors.yellow),
+                                  borderSide:
+                                  const BorderSide(color: Colors.yellow),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide:
+                                  const BorderSide(color: Colors.yellow),
                                 ),
                               ),
                             ),
@@ -201,13 +211,21 @@ class _ReusableLoginState extends State<ReusableLogin> {
                             TextField(
                               controller: passwordController,
                               obscureText: true,
-                              style: GoogleFonts.poppins(fontSize: 16, color: Colors.white),
+                              style: GoogleFonts.poppins(
+                                  fontSize: 16, color: Colors.white),
                               decoration: InputDecoration(
                                 hintText: 'Enter Password',
-                                hintStyle: GoogleFonts.poppins(fontSize: 16, color: Colors.white60),
+                                hintStyle: GoogleFonts.poppins(
+                                    fontSize: 16, color: Colors.white60),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(color: Colors.yellow),
+                                  borderSide:
+                                  const BorderSide(color: Colors.yellow),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide:
+                                  const BorderSide(color: Colors.yellow),
                                 ),
                               ),
                             ),
@@ -222,8 +240,11 @@ class _ReusableLoginState extends State<ReusableLogin> {
                                 ),
                                 GestureDetector(
                                   onTap: () {
-                                    Navigator.push(context,
-                                        MaterialPageRoute(builder: (_) => widget.registerPage));
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (_) => widget.registerPage),
+                                    );
                                   },
                                   child: Text('REGISTER NOW',
                                     style: GoogleFonts.poppins(
