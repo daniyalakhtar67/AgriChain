@@ -2,7 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:argichain/services/database_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CNICFormatter extends TextInputFormatter {
   @override
@@ -29,14 +29,13 @@ class ShopkeeperRegister extends StatefulWidget {
 }
 
 class _ShopkeeperRegisterState extends State<ShopkeeperRegister> {
-  // Controllers to capture user input
-  final _nameController = TextEditingController();
-  final _cnicController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _ageController = TextEditingController();
-  final _shopNameController = TextEditingController();
+  final _nameController        = TextEditingController();
+  final _cnicController        = TextEditingController();
+  final _phoneController       = TextEditingController();
+  final _ageController         = TextEditingController();
+  final _shopNameController    = TextEditingController();
   final _shopAddressController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _passwordController    = TextEditingController();
 
   bool _isLoading = false;
 
@@ -52,52 +51,61 @@ class _ShopkeeperRegisterState extends State<ShopkeeperRegister> {
     super.dispose();
   }
 
-  // Database Connection Logic
+  // ── Supabase DB Logic ────────────────────────────────────────────────────────
   Future<void> _register() async {
-    final name = _nameController.text.trim();
-    final cnic = _cnicController.text.trim();
+    final name  = _nameController.text.trim();
+    final cnic  = _cnicController.text.trim();
     final phone = _phoneController.text.trim();
-    final age = _ageController.text.trim();
+    final age   = _ageController.text.trim();
     final sName = _shopNameController.text.trim();
     final sAddr = _shopAddressController.text.trim();
-    final pass = _passwordController.text.trim();
+    final pass  = _passwordController.text.trim();
 
     // Validation
-    if (name.isEmpty || cnic.isEmpty || phone.isEmpty || age.isEmpty || sName.isEmpty || sAddr.isEmpty || pass.isEmpty) {
+    if (name.isEmpty || cnic.isEmpty || phone.isEmpty || age.isEmpty ||
+        sName.isEmpty || sAddr.isEmpty || pass.isEmpty) {
       _showSnack('All fields are required', isError: true);
       return;
     }
-
     if (cnic.length != 15) {
       _showSnack('Enter complete 13-digit CNIC', isError: true);
+      return;
+    }
+    if (pass.length < 6) {
+      _showSnack('Password must be at least 6 characters', isError: true);
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      // Mapping UI data to Database Table columns
-      final id = await DatabaseService.instance.insertShopkeeper({
-        'cnic': cnic,
-        'phone': phone,
-        'shopkeeper_name': name,
-        'age': int.tryParse(age) ?? 0,
-        'shop_name': sName,
+      // Check for duplicate CNIC
+      final existing = await Supabase.instance.client
+          .from('shopkeepers')
+          .select()
+          .eq('cnic', cnic);
+
+      if (existing.isNotEmpty) {
+        _showSnack('This CNIC is already registered!', isError: true);
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // Insert into Supabase — columns match exact table schema
+      await Supabase.instance.client.from('shopkeepers').insert({
+        'full_name'   : name,
+        'cnic'        : cnic,
+        'phone'       : phone,
+        'shop_name'   : sName,
         'shop_address': sAddr,
-        'shop_size': 'Standard', // Default value
-        'password': pass,
-        'created_at': DateTime.now().toIso8601String(),
+        'password'    : pass,
       });
 
-      if (id > 0) {
-        _showSnack('Shopkeeper Registered Successfully!');
-        await Future.delayed(const Duration(seconds: 1));
-        if (mounted) Navigator.pop(context);
-      }
+      _showSnack('Shopkeeper Registered Successfully!');
+      await Future.delayed(const Duration(seconds: 1));
+      if (mounted) Navigator.pop(context);
     } catch (e) {
-      _showSnack(e.toString().contains('UNIQUE')
-          ? 'This CNIC is already registered!'
-          : 'Registration failed. Try again.', isError: true);
+      _showSnack('Registration failed. Try again.', isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -114,18 +122,18 @@ class _ShopkeeperRegisterState extends State<ShopkeeperRegister> {
     );
   }
 
+  // ── UI ───────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.green.shade900,
         centerTitle: true,
-        // Custom Two-Tone Title
         title: RichText(
           text: TextSpan(
             style: GoogleFonts.montserrat(fontSize: 20, fontWeight: FontWeight.bold),
             children: const [
-              TextSpan(text: 'Agri', style: TextStyle(color: Colors.white)),
+              TextSpan(text: 'Agri',  style: TextStyle(color: Colors.white)),
               TextSpan(text: 'Chain', style: TextStyle(color: Colors.yellow)),
             ],
           ),
@@ -134,18 +142,25 @@ class _ShopkeeperRegisterState extends State<ShopkeeperRegister> {
       body: Container(
         height: double.infinity,
         decoration: const BoxDecoration(
-          image: DecorationImage(image: AssetImage('assets/images/SR_bg.jpg'), fit: BoxFit.cover),
+          image: DecorationImage(
+            image: AssetImage('assets/images/SR_bg.jpg'),
+            fit: BoxFit.cover,
+          ),
         ),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              // Header Text
-              Text('Shopkeeper Registration',
-                  style: GoogleFonts.montserrat(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.yellow)),
+              Text(
+                'Shopkeeper Registration',
+                style: GoogleFonts.montserrat(
+                    fontSize: 22, fontWeight: FontWeight.bold, color: Colors.yellow),
+              ),
               const SizedBox(height: 5),
-              Text('Fill in your details to get started',
-                  style: GoogleFonts.poppins(fontSize: 14, color: Colors.white70)),
+              Text(
+                'Fill in your details to get started',
+                style: GoogleFonts.poppins(fontSize: 14, color: Colors.white70),
+              ),
               const SizedBox(height: 25),
 
               ClipRRect(
@@ -157,17 +172,59 @@ class _ShopkeeperRegisterState extends State<ShopkeeperRegister> {
                     color: Colors.black.withValues(alpha: 0.5),
                     child: Column(
                       children: [
-                        _buildField(label: 'SHOPKEEPER NAME', controller: _nameController, icon: Icons.person, hint: 'Full Name'),
-                        _buildField(label: 'CNIC', controller: _cnicController, icon: Icons.badge, hint: '12345-1234567-1', keyboardType: TextInputType.number, formatters: [CNICFormatter()], maxLength: 15),
-                        _buildField(label: 'PHONE NUMBER', controller: _phoneController, icon: Icons.phone, hint: '03XXXXXXXXX', keyboardType: TextInputType.phone),
-                        _buildField(label: 'AGE', controller: _ageController, icon: Icons.calendar_today, hint: 'e.g. 30', keyboardType: TextInputType.number),
-                        _buildField(label: 'SHOP NAME', controller: _shopNameController, icon: Icons.store, hint: 'e.g. Madina Mart'),
-                        _buildField(label: 'SHOP ADDRESS', controller: _shopAddressController, icon: Icons.location_on, hint: 'Full Address'),
+                        _buildField(
+                          label: 'SHOPKEEPER NAME',
+                          controller: _nameController,
+                          icon: Icons.person,
+                          hint: 'Full Name',
+                        ),
+                        _buildField(
+                          label: 'CNIC',
+                          controller: _cnicController,
+                          icon: Icons.badge,
+                          hint: '12345-1234567-1',
+                          keyboardType: TextInputType.number,
+                          formatters: [CNICFormatter()],
+                          maxLength: 15,
+                        ),
+                        _buildField(
+                          label: 'PHONE NUMBER',
+                          controller: _phoneController,
+                          icon: Icons.phone,
+                          hint: '03XXXXXXXXX',
+                          keyboardType: TextInputType.phone,
+                        ),
+                        _buildField(
+                          label: 'AGE',
+                          controller: _ageController,
+                          icon: Icons.calendar_today,
+                          hint: 'e.g. 30',
+                          keyboardType: TextInputType.number,
+                        ),
+                        _buildField(
+                          label: 'SHOP NAME',
+                          controller: _shopNameController,
+                          icon: Icons.store,
+                          hint: 'e.g. Madina Mart',
+                        ),
+                        _buildField(
+                          label: 'SHOP ADDRESS',
+                          controller: _shopAddressController,
+                          icon: Icons.location_on,
+                          hint: 'Full Address',
+                        ),
 
+                        // Password field with show/hide toggle
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('PASSWORD', style: GoogleFonts.montserrat(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.yellow)),
+                            Text(
+                              'PASSWORD',
+                              style: GoogleFonts.montserrat(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.yellow),
+                            ),
                             const SizedBox(height: 6),
                             _PasswordField(controller: _passwordController),
                           ],
@@ -180,12 +237,19 @@ class _ShopkeeperRegisterState extends State<ShopkeeperRegister> {
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _register,
                             style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green.shade700,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                              backgroundColor: Colors.green.shade700,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
                             ),
                             child: _isLoading
                                 ? const CircularProgressIndicator(color: Colors.white)
-                                : const Text('REGISTER SHOP', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                                : const Text(
+                              'REGISTER SHOP',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16),
+                            ),
                           ),
                         ),
                       ],
@@ -212,7 +276,11 @@ class _ShopkeeperRegisterState extends State<ShopkeeperRegister> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: GoogleFonts.montserrat(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.yellow)),
+        Text(
+          label,
+          style: GoogleFonts.montserrat(
+              fontSize: 12, fontWeight: FontWeight.bold, color: Colors.yellow),
+        ),
         const SizedBox(height: 6),
         TextField(
           controller: controller,
@@ -227,14 +295,14 @@ class _ShopkeeperRegisterState extends State<ShopkeeperRegister> {
             filled: true,
             fillColor: Colors.white.withValues(alpha: 0.05),
             enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.yellow.withValues(alpha: 0.3))
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.yellow.withValues(alpha: 0.3)),
             ),
             focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.yellow)
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.yellow),
             ),
-            counterText: "",
+            counterText: '',
           ),
         ),
         const SizedBox(height: 12),
@@ -243,33 +311,46 @@ class _ShopkeeperRegisterState extends State<ShopkeeperRegister> {
   }
 }
 
+// ── Password Field with visibility toggle ────────────────────────────────────
 class _PasswordField extends StatefulWidget {
   final TextEditingController controller;
   const _PasswordField({required this.controller});
+
   @override
   State<_PasswordField> createState() => _PasswordFieldState();
 }
 
 class _PasswordFieldState extends State<_PasswordField> {
   bool _obscure = true;
+
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: widget.controller,
       obscureText: _obscure,
-      style: const TextStyle(color: Colors.white),
+      style: GoogleFonts.poppins(fontSize: 14, color: Colors.white),
       decoration: InputDecoration(
         hintText: 'Enter Password',
-        hintStyle: const TextStyle(color: Colors.white38),
-        prefixIcon: const Icon(Icons.lock, color: Colors.yellow),
+        hintStyle: GoogleFonts.poppins(fontSize: 13, color: Colors.white38),
+        prefixIcon:
+        Icon(Icons.lock, color: Colors.yellow.withValues(alpha: 0.7), size: 20),
         suffixIcon: IconButton(
-            icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility, color: Colors.white54),
-            onPressed: () => setState(() => _obscure = !_obscure)
+          icon: Icon(
+            _obscure ? Icons.visibility_off : Icons.visibility,
+            color: Colors.white54,
+          ),
+          onPressed: () => setState(() => _obscure = !_obscure),
         ),
         filled: true,
         fillColor: Colors.white.withValues(alpha: 0.05),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white24)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.yellow)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.yellow.withValues(alpha: 0.3)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.yellow),
+        ),
       ),
     );
   }

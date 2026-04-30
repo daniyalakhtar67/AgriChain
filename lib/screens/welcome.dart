@@ -62,7 +62,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 ),
               ),
 
-              // 3 BUTTONS
               Column(
                 children: [
 
