@@ -1,4 +1,5 @@
 import 'package:argichain/screens/buyer/buyer_register.dart';
+import 'package:argichain/screens/farmer/farmer_dashboard.dart';
 import 'package:argichain/screens/farmer/farmer_login.dart';
 import 'package:argichain/screens/welcome.dart';
 import 'package:flutter/material.dart';
@@ -26,7 +27,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.green,
       ),
-      home: WelcomeScreen(),
+      home: FarmerDashboard(farmerName: 'Daniyal'),
       routes: {
         '/welcome': (context) => const WelcomeScreen(),
         '/buyerRegister': (context) => const BuyerRegister(),
