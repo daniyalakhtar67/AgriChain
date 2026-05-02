@@ -58,12 +58,13 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
     }
   }
 
+  // ✅ FIX: Null-safe search
   void _onSearch() {
     final query = searchController.text.toLowerCase();
     setState(() {
       filteredProducts = allProducts.where((p) {
-        return p['title'].toString().toLowerCase().contains(query) ||
-            p['category'].toString().toLowerCase().contains(query);
+        return (p['title'] ?? '').toString().toLowerCase().contains(query) ||
+            (p['category'] ?? '').toString().toLowerCase().contains(query);
       }).toList();
     });
   }
@@ -76,7 +77,6 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _buildBuyScreen(),
-      // ✅ FIX: Black navbar with white icons — same as shopkeeper
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.grey.shade900,
@@ -92,11 +92,12 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
             }
           },
           selectedItemColor: Colors.green,
-          unselectedItemColor: Colors.white,    // ✅ white icons
+          unselectedItemColor: Colors.white,
           type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.transparent,  // ✅ transparent so Container shows
+          backgroundColor: Colors.transparent,
           elevation: 0,
-          selectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 11),
+          selectedLabelStyle:
+          GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 11),
           unselectedLabelStyle: GoogleFonts.poppins(fontSize: 11),
           items: const [
             BottomNavigationBarItem(
@@ -127,7 +128,8 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -135,15 +137,27 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                          filter:
+                          ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 24, vertical: 10),
                             color: Colors.black.withValues(alpha: 0.3),
                             child: RichText(
                               text: TextSpan(
                                 children: [
-                                  TextSpan(text: 'Buy', style: GoogleFonts.poppins(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white)),
-                                  TextSpan(text: 'er', style: GoogleFonts.poppins(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.green)),
+                                  TextSpan(
+                                      text: 'Buy',
+                                      style: GoogleFonts.poppins(
+                                          fontSize: 26,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white)),
+                                  TextSpan(
+                                      text: 'er',
+                                      style: GoogleFonts.poppins(
+                                          fontSize: 26,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.green)),
                                 ],
                               ),
                             ),
@@ -154,8 +168,10 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: GestureDetector(
-                        onTap: () => Navigator.push(context,
-                            MaterialPageRoute(builder: (_) => const BuyerCartScreen())),
+                        onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const BuyerCartScreen())),
                         child: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
@@ -163,7 +179,8 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: Colors.white24),
                           ),
-                          child: const Icon(Icons.shopping_cart_outlined, color: Colors.white, size: 24),
+                          child: const Icon(Icons.shopping_cart_outlined,
+                              color: Colors.white, size: 24),
                         ),
                       ),
                     ),
@@ -184,10 +201,13 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       hintText: 'Search crops...',
-                      hintStyle: GoogleFonts.poppins(color: Colors.white60),
-                      prefixIcon: const Icon(Icons.search, color: Colors.white60),
+                      hintStyle:
+                      GoogleFonts.poppins(color: Colors.white60),
+                      prefixIcon:
+                      const Icon(Icons.search, color: Colors.white60),
                       border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                      contentPadding:
+                      const EdgeInsets.symmetric(vertical: 14),
                     ),
                   ),
                 ),
@@ -197,7 +217,8 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
 
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
                   color: Colors.grey.withValues(alpha: 0.35),
                   borderRadius: BorderRadius.circular(12),
@@ -206,8 +227,16 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Trending Crops', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-                    Text('See all (${filteredProducts.length})', style: GoogleFonts.poppins(fontSize: 13, color: Colors.greenAccent, fontWeight: FontWeight.w600)),
+                    Text('Trending Crops',
+                        style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white)),
+                    Text('See all (${filteredProducts.length})',
+                        style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            color: Colors.greenAccent,
+                            fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
@@ -216,16 +245,23 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
 
               Expanded(
                 child: isLoading
-                    ? const Center(child: CircularProgressIndicator(color: Colors.green))
+                    ? const Center(
+                    child:
+                    CircularProgressIndicator(color: Colors.green))
                     : filteredProducts.isEmpty
-                    ? Center(child: Text('No crops found', style: GoogleFonts.poppins(color: Colors.white)))
+                    ? Center(
+                    child: Text('No crops found',
+                        style: GoogleFonts.poppins(
+                            color: Colors.white)))
                     : RefreshIndicator(
                   onRefresh: fetchFarmerProducts,
                   child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16),
                     itemCount: filteredProducts.length,
                     itemBuilder: (context, index) {
-                      return _ProductCard(product: filteredProducts[index]);
+                      return _ProductCard(
+                          product: filteredProducts[index]);
                     },
                   ),
                 ),
@@ -242,12 +278,69 @@ class _ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
   const _ProductCard({required this.product});
 
+  Future<void> _quickAddToCart(BuildContext context) async {
+    final supabase = Supabase.instance.client;
+    try {
+      await supabase.from('cart').insert({
+        'product_id': product['id'],
+        'product_title': product['title'],
+        'product_price': product['price'],
+        'product_image': product['image_url'],
+        'seller_name': product['seller_name'],
+        'seller_type': product['seller_type'] ?? 'farmer',
+        'quantity': 1,
+      });
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle,
+                    color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('${product['title']} added to cart!',
+                      style: GoogleFonts.poppins(
+                          color: Colors.white, fontSize: 13)),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const BuyerCartScreen()));
+                  },
+                  child: Text('View Cart',
+                      style: GoogleFonts.poppins(
+                          color: Colors.yellow,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13)),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green.shade700,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => BuyerProductDetail(product: product)),
+        MaterialPageRoute(
+            builder: (_) => BuyerProductDetail(product: product)),
       ),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
@@ -266,25 +359,35 @@ class _ProductCard extends StatelessWidget {
               child: product['image_url'] != null
                   ? CachedNetworkImage(
                 imageUrl: product['image_url'],
-                width: 110, height: 100, fit: BoxFit.cover,
+                width: 110,
+                height: 100,
+                fit: BoxFit.cover,
                 placeholder: (_, __) => Container(
-                    width: 110, height: 100,
+                    width: 110,
+                    height: 100,
                     color: Colors.grey.shade800,
-                    child: const Center(child: CircularProgressIndicator(color: Colors.green, strokeWidth: 2))),
+                    child: const Center(
+                        child: CircularProgressIndicator(
+                            color: Colors.green, strokeWidth: 2))),
                 errorWidget: (_, __, ___) => Container(
-                    width: 110, height: 100,
+                    width: 110,
+                    height: 100,
                     color: Colors.grey.shade800,
-                    child: const Icon(Icons.image_not_supported, color: Colors.white54)),
+                    child: const Icon(Icons.image_not_supported,
+                        color: Colors.white54)),
               )
                   : Container(
-                width: 110, height: 100,
+                width: 110,
+                height: 100,
                 color: Colors.grey.shade800,
-                child: const Icon(Icons.image, color: Colors.white54),
+                child:
+                const Icon(Icons.image, color: Colors.white54),
               ),
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -294,25 +397,62 @@ class _ProductCard extends StatelessWidget {
                         Flexible(
                           child: Text(product['title'] ?? '',
                               style: GoogleFonts.poppins(
-                                  fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white)),
                         ),
                         Text(product['price'] ?? '',
                             style: GoogleFonts.poppins(
-                                fontSize: 13, fontWeight: FontWeight.w600, color: Colors.greenAccent)),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.greenAccent)),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(product['location'] ?? '',
-                        style: GoogleFonts.poppins(fontSize: 11, color: Colors.white60)),
+                        style: GoogleFonts.poppins(
+                            fontSize: 11, color: Colors.white60)),
                     const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(8)),
-                      child: Text(product['category'] ?? '',
-                          style: GoogleFonts.poppins(
-                              fontSize: 11, color: Colors.greenAccent, fontWeight: FontWeight.w500)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(8)),
+                          child: Text(product['category'] ?? '',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  color: Colors.greenAccent,
+                                  fontWeight: FontWeight.w500)),
+                        ),
+                        GestureDetector(
+                          onTap: () => _quickAddToCart(context),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.green,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.add,
+                                    color: Colors.white, size: 14),
+                                const SizedBox(width: 3),
+                                Text('Add',
+                                    style: GoogleFonts.poppins(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

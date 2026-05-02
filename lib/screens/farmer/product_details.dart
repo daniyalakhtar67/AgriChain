@@ -21,7 +21,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
   late AnimationController _fadeCtrl;
   late Animation<double> _fadeAnim;
 
-  // Quantity selector
   int _selectedQty = 1;
   int _maxStock = 0;
 
@@ -33,10 +32,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeIn);
     _fadeCtrl.forward();
 
-    // Parse stock quantity
     final stock = widget.product['stock_quantity'];
-    _maxStock =
-    (stock != null && int.tryParse(stock.toString()) != null)
+    _maxStock = (stock != null && int.tryParse(stock.toString()) != null)
         ? int.parse(stock.toString())
         : 0;
   }
@@ -58,13 +55,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     }
     try {
       await supabase.from('farmer_cart').insert({
-        'product_id': widget.product['id'],
+        'product_id':    widget.product['id'],
         'product_title': widget.product['title'],
         'product_price': widget.product['price'],
         'product_image': widget.product['image_url'],
-        'seller_name': widget.product['seller_name'],
-        'seller_type': widget.product['seller_type'],
-        'quantity': _selectedQty,
+        'seller_name':   widget.product['seller_name'],
+        'seller_type':   widget.product['seller_type'],
+        'quantity':      _selectedQty,
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -79,15 +76,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                 GestureDetector(
                   onTap: () {
                     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const CartScreen()));
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const CartScreen()));
                   },
                   child: Text('View Cart',
                       style: GoogleFonts.poppins(
-                          color: Colors.yellow,
-                          fontWeight: FontWeight.bold)),
+                          color: Colors.yellow, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -101,6 +95,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
     }
+  }
+
+  void _navigateToBuyNow() {
+    if (_maxStock <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Item out of stock!'),
+            backgroundColor: Colors.red),
+      );
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BuyNowScreen(
+          product: widget.product,
+          selectedQty: _selectedQty,
+          onOrderPlaced: (int newStock) {
+            setState(() => _maxStock = newStock);
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _openWhatsApp() async {
@@ -144,7 +161,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
 
     return Column(
       children: [
-        // ── App Bar ──
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
@@ -162,8 +178,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                     overflow: TextOverflow.ellipsis),
               ),
               GestureDetector(
-                onTap: () => Navigator.push(
-                    context,
+                onTap: () => Navigator.push(context,
                     MaterialPageRoute(builder: (_) => const CartScreen())),
                 child: Container(
                   padding: const EdgeInsets.all(8),
@@ -186,7 +201,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Product Image ──
                 Stack(
                   children: [
                     ClipRRect(
@@ -214,7 +228,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                           child: const Icon(Icons.image,
                               color: Colors.white54, size: 60)),
                     ),
-                    // ── Stock overlay badge on image ──
                     Positioned(
                       top: 12,
                       right: 12,
@@ -255,7 +268,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
 
                 const SizedBox(height: 16),
 
-                // ── Title & Price ──
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -284,7 +296,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
 
                 const SizedBox(height: 8),
 
-                // ── Category & Location ──
                 Row(
                   children: [
                     Container(
@@ -309,11 +320,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
 
                 const SizedBox(height: 16),
 
-                // ── STOCK INFO CARD ──
                 if (!isOutOfStock) ...[
                   _stockCard(),
                   const SizedBox(height: 12),
-                  // ── QUANTITY SELECTOR ──
                   _quantitySelector(),
                   const SizedBox(height: 12),
                 ] else ...[
@@ -321,7 +330,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                   const SizedBox(height: 12),
                 ],
 
-                // ── Info Cards ──
                 _infoCard(
                     icon: Icons.description_outlined,
                     title: 'Description',
@@ -335,7 +343,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                 _sellerCard(p),
                 const SizedBox(height: 24),
 
-                // ── Action Buttons ──
                 if (!isOutOfStock) ...[
                   Row(
                     children: [
@@ -356,10 +363,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                           ),
                         ),
                       ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _navigateToBuyNow,
+                          icon: const Icon(Icons.shopping_bag_outlined,
+                              color: Colors.white, size: 18),
+                          label: Text('Buy Now',
+                              style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14)),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
                 ],
+
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
@@ -386,7 +412,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     );
   }
 
-  // ── Stock Info Card ──
   Widget _stockCard() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
@@ -397,7 +422,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
           decoration: BoxDecoration(
             color: Colors.blue.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.lightBlueAccent.withValues(alpha: 0.4)),
+            border:
+            Border.all(color: Colors.lightBlueAccent.withValues(alpha: 0.4)),
           ),
           child: Row(
             children: [
@@ -427,26 +453,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                 ],
               ),
               const Spacer(),
-              // ── Stock level indicator ──
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    _maxStock > 20
-                        ? '🟢 High Stock'
+              Text(
+                _maxStock > 20
+                    ? '🟢 High Stock'
+                    : _maxStock > 5
+                    ? '🟡 Limited'
+                    : '🔴 Low Stock',
+                style: GoogleFonts.poppins(
+                    color: _maxStock > 20
+                        ? Colors.greenAccent
                         : _maxStock > 5
-                        ? '🟡 Limited'
-                        : '🔴 Low Stock',
-                    style: GoogleFonts.poppins(
-                        color: _maxStock > 20
-                            ? Colors.greenAccent
-                            : _maxStock > 5
-                            ? Colors.yellow
-                            : Colors.redAccent,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600),
-                  ),
-                ],
+                        ? Colors.yellow
+                        : Colors.redAccent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -455,7 +475,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     );
   }
 
-  // ── Quantity Selector ──
   Widget _quantitySelector() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
@@ -483,20 +502,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                           fontWeight: FontWeight.w600)),
                   const Spacer(),
                   Text('Max: $_maxStock',
-                      style: GoogleFonts.poppins(
-                          color: Colors.white54, fontSize: 12)),
+                      style:
+                      GoogleFonts.poppins(color: Colors.white54, fontSize: 12)),
                 ],
               ),
               const SizedBox(height: 14),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // ── Minus Button ──
                   GestureDetector(
                     onTap: () {
-                      if (_selectedQty > 1) {
-                        setState(() => _selectedQty--);
-                      }
+                      if (_selectedQty > 1) setState(() => _selectedQty--);
                     },
                     child: Container(
                       width: 44,
@@ -506,11 +522,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.white24),
                       ),
-                      child: const Icon(Icons.remove,
-                          color: Colors.white, size: 20),
+                      child:
+                      const Icon(Icons.remove, color: Colors.white, size: 20),
                     ),
                   ),
-                  // ── Qty Display ──
                   Container(
                     width: 80,
                     margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -529,7 +544,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                           fontWeight: FontWeight.bold),
                     ),
                   ),
-                  // ── Plus Button ──
                   GestureDetector(
                     onTap: () {
                       if (_selectedQty < _maxStock) {
@@ -537,8 +551,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                              content: Text(
-                                  'Maximum $_maxStock units available!'),
+                              content: Text('Maximum $_maxStock units available!'),
                               backgroundColor: Colors.orange),
                         );
                       }
@@ -559,11 +572,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                 ],
               ),
               const SizedBox(height: 10),
-              // ── Quick select buttons ──
               if (_maxStock >= 5) ...[
                 Text('Quick Select:',
-                    style: GoogleFonts.poppins(
-                        color: Colors.white54, fontSize: 11)),
+                    style:
+                    GoogleFonts.poppins(color: Colors.white54, fontSize: 11)),
                 const SizedBox(height: 6),
                 Wrap(
                   spacing: 8,
@@ -604,7 +616,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     );
   }
 
-  // ── Out of Stock Banner ──
   Widget _outOfStockBanner() {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -688,8 +699,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
           decoration: BoxDecoration(
             color: Colors.green.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(14),
-            border:
-            Border.all(color: Colors.green.withValues(alpha: 0.4)),
+            border: Border.all(color: Colors.green.withValues(alpha: 0.4)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -707,8 +717,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                 ],
               ),
               const SizedBox(height: 10),
-              _sellerRow(Icons.person_outline, 'Name',
-                  p['seller_name'] ?? 'N/A'),
+              _sellerRow(
+                  Icons.person_outline, 'Name', p['seller_name'] ?? 'N/A'),
               const SizedBox(height: 6),
               _sellerRow(Icons.location_on_outlined, 'Location',
                   p['location'] ?? 'N/A'),
@@ -733,6 +743,390 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                     fontSize: 12,
                     fontWeight: FontWeight.w600))),
       ],
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  BUY NOW SCREEN — Image 1 style (dark navy card)
+// ════════════════════════════════════════════════════════════════
+class BuyNowScreen extends StatefulWidget {
+  final Map<String, dynamic> product;
+  final int selectedQty;
+  final void Function(int newStock) onOrderPlaced;
+
+  const BuyNowScreen({
+    super.key,
+    required this.product,
+    required this.selectedQty,
+    required this.onOrderPlaced,
+  });
+
+  @override
+  State<BuyNowScreen> createState() => _BuyNowScreenState();
+}
+
+class _BuyNowScreenState extends State<BuyNowScreen> {
+  final supabase = Supabase.instance.client;
+
+  final nameC    = TextEditingController();
+  final phoneC   = TextEditingController();
+  final addressC = TextEditingController();
+
+  bool _placing = false;
+
+  @override
+  void dispose() {
+    nameC.dispose();
+    phoneC.dispose();
+    addressC.dispose();
+    super.dispose();
+  }
+
+  Future<void> _placeOrder() async {
+    if (nameC.text.trim().isEmpty ||
+        phoneC.text.trim().isEmpty ||
+        addressC.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Please fill all fields!'),
+          backgroundColor: Colors.red));
+      return;
+    }
+
+    setState(() => _placing = true);
+
+    try {
+      await supabase.from('orders').insert({
+        'product_id':     widget.product['id']?.toString().trim() ?? '',
+        'product_title':  widget.product['title'] ?? '',
+        'product_price':  widget.product['price'] ?? '',
+        'seller_name':    widget.product['seller_name'] ?? '',
+        'seller_type':    widget.product['seller_type'] ?? 'shopkeeper',
+        'buyer_name':     nameC.text.trim(),
+        'buyer_phone':    phoneC.text.trim(),
+        'buyer_address':  addressC.text.trim(),
+        'payment_method': widget.product['payment_method'] ?? 'Not specified',
+        'quantity':       widget.selectedQty,
+        'status':         'pending',
+        'created_at':     DateTime.now().toIso8601String(),
+      });
+
+      final productId = widget.product['id']?.toString().trim() ?? '';
+      int newStock = 0;
+      if (productId.isNotEmpty) {
+        try {
+          final res = await supabase
+              .from('products')
+              .select('stock_quantity')
+              .filter('id', 'eq', productId)
+              .maybeSingle();
+          if (res != null && res['stock_quantity'] != null) {
+            final currentStock =
+                int.tryParse(res['stock_quantity'].toString()) ?? 0;
+            newStock = (currentStock - widget.selectedQty).clamp(0, 999999);
+            await supabase
+                .from('products')
+                .update({'stock_quantity': newStock})
+                .filter('id', 'eq', productId);
+          }
+        } catch (stockErr) {
+          debugPrint('Stock deduct error: $stockErr');
+        }
+      }
+
+      setState(() => _placing = false);
+      widget.onOrderPlaced(newStock);
+
+      if (mounted) {
+        Navigator.pop(context);
+        _showSuccessDialog();
+      }
+    } catch (e) {
+      setState(() => _placing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        backgroundColor: Colors.grey.shade900,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle, color: Colors.green, size: 70),
+            const SizedBox(height: 16),
+            Text('Order Placed!',
+                style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('Seller will contact you shortly.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                    color: Colors.white60, fontSize: 13)),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.pop(context);
+              },
+              child: Text('Back to Dashboard',
+                  style: GoogleFonts.poppins(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.product;
+
+    return Scaffold(
+      body: Stack(
+        children: [
+          SizedBox.expand(
+              child: Image.asset('assets/images/DF.jpg', fit: BoxFit.cover)),
+          SizedBox.expand(
+              child: Container(color: Colors.black.withValues(alpha: 0.75))),
+          SafeArea(
+            child: Column(
+              children: [
+                // ── App Bar ──
+                Padding(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new,
+                            color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      Text('Your Details',
+                          style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+
+                        // ── Product Summary Card — Image 1 style ──
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            // ← dark navy blue — same as Image 1
+                            color: const Color(0xFF1A2535),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.12)),
+                          ),
+                          child: Row(
+                            children: [
+                              // ── Product Image ──
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: p['image_url'] != null
+                                    ? CachedNetworkImage(
+                                    imageUrl: p['image_url'],
+                                    width: 64,
+                                    height: 64,
+                                    fit: BoxFit.cover,
+                                    placeholder: (_, __) => Container(
+                                        width: 64,
+                                        height: 64,
+                                        color: const Color(0xFF0D1B2A),
+                                        child: const Icon(Icons.image,
+                                            color: Colors.white38)),
+                                    errorWidget: (_, __, ___) => Container(
+                                        width: 64,
+                                        height: 64,
+                                        color: const Color(0xFF0D1B2A),
+                                        child: const Icon(
+                                            Icons.image_not_supported,
+                                            color: Colors.white38)))
+                                    : Container(
+                                    width: 64,
+                                    height: 64,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0D1B2A),
+                                      borderRadius:
+                                      BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(Icons.image,
+                                        color: Colors.white38)),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Title
+                                    Text(p['title'] ?? '',
+                                        style: GoogleFonts.poppins(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15)),
+                                    const SizedBox(height: 4),
+                                    // Price — green
+                                    Text(p['price'] ?? '',
+                                        style: GoogleFonts.poppins(
+                                            color: Colors.greenAccent,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14)),
+                                    const SizedBox(height: 6),
+                                    // Units badge — green outline
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green
+                                            .withValues(alpha: 0.15),
+                                        borderRadius:
+                                        BorderRadius.circular(20),
+                                        border: Border.all(
+                                            color: Colors.greenAccent
+                                                .withValues(alpha: 0.6)),
+                                      ),
+                                      child: Text(
+                                        '🛒 ${widget.selectedQty} unit(s) selected',
+                                        style: GoogleFonts.poppins(
+                                            color: Colors.greenAccent,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // ── Enter Your Details ──
+                        Text('Enter Your Details',
+                            style: GoogleFonts.poppins(
+                                color: Colors.yellow,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 12),
+
+                        _field('Your Name', nameC, Icons.person_outline),
+                        const SizedBox(height: 12),
+
+                        _field('Phone Number', phoneC, Icons.phone_outlined,
+                            type: TextInputType.phone),
+                        const SizedBox(height: 12),
+
+                        _field('Delivery Address', addressC,
+                            Icons.location_on_outlined,
+                            maxLines: 3),
+                        const SizedBox(height: 16),
+
+                        // ── Payment info ──
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.yellow.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                                color: Colors.yellow.withValues(alpha: 0.4)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.credit_card,
+                                  color: Colors.yellow, size: 18),
+                              const SizedBox(width: 10),
+                              Flexible(
+                                child: Text(
+                                  'Payment: ${p['payment_method'] ?? 'Ask the seller'}',
+                                  style: GoogleFonts.poppins(
+                                      color: Colors.yellow, fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // ── Place Order Button ──
+                        SizedBox(
+                          width: double.infinity,
+                          height: 54,
+                          child: ElevatedButton(
+                            onPressed: _placing ? null : _placeOrder,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16)),
+                            ),
+                            child: _placing
+                                ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                    color: Colors.white, strokeWidth: 2.5))
+                                : Text('Place Order',
+                                style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                        const SizedBox(height: 30),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _field(String label, TextEditingController c, IconData icon,
+      {TextInputType type = TextInputType.text, int maxLines = 1}) {
+    return TextField(
+      controller: c,
+      keyboardType: type,
+      maxLines: maxLines,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: GoogleFonts.poppins(color: Colors.white60),
+        prefixIcon: Icon(icon, color: Colors.greenAccent),
+        filled: true,
+        // ← dark navy fill — same as Image 1
+        fillColor: const Color(0xFF1A2535),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide:
+            BorderSide(color: Colors.white.withValues(alpha: 0.12))),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Colors.greenAccent)),
+      ),
     );
   }
 }

@@ -1,6 +1,8 @@
 import 'dart:ui';
 import 'package:argichain/screens/farmer/cart_screen.dart';
+import 'package:argichain/screens/farmer/cropdetailscreen.dart';
 import 'package:argichain/screens/farmer/product_details.dart';
+import 'package:argichain/screens/farmer/crop_detail_screen.dart'; // ── NEW ──
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -333,110 +335,127 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                 ),
               ),
               Expanded(
-                child: FutureBuilder(
-                  future: supabase
-                      .from('products')
-                      .select()
-                      .eq('seller_type', 'farmer')
-                      .order('created_at', ascending: false),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState ==
-                        ConnectionState.waiting) {
-                      return const Center(
-                          child: CircularProgressIndicator(
-                              color: Colors.green));
-                    }
-                    final crops =
-                    List<Map<String, dynamic>>.from(snapshot.data ?? []);
-                    if (crops.isEmpty) {
-                      return Center(
-                          child: Text('No crops listed yet\nTap + to add',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.poppins(
-                                  color: Colors.white70)));
-                    }
-                    return ListView.builder(
-                      padding:
-                      const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: crops.length,
-                      itemBuilder: (context, index) {
-                        final crop = crops[index];
-                        // ── KG quantity badge ──
-                        final kgQty = crop['crop_quantity_kg'];
-                        final kgText = (kgQty != null &&
-                            double.tryParse(kgQty.toString()) != null &&
-                            double.parse(kgQty.toString()) > 0)
-                            ? '${double.parse(kgQty.toString()).toStringAsFixed(1)} KG'
-                            : null;
+                child: StatefulBuilder(
+                  builder: (ctx, setS) => FutureBuilder(
+                    future: supabase
+                        .from('products')
+                        .select()
+                        .eq('seller_type', 'farmer')
+                        .order('created_at', ascending: false),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(
+                            child: CircularProgressIndicator(color: Colors.green));
+                      }
+                      final crops =
+                      List<Map<String, dynamic>>.from(snapshot.data ?? []);
+                      if (crops.isEmpty) {
+                        return Center(
+                            child: Text('No crops listed yet\nTap + to add',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.poppins(color: Colors.white70)));
+                      }
+                      return ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: crops.length,
+                        itemBuilder: (context, index) {
+                          final crop = crops[index];
+                          final kgQty = crop['crop_quantity_kg'];
+                          final kgVal = (kgQty != null &&
+                              double.tryParse(kgQty.toString()) != null)
+                              ? double.parse(kgQty.toString())
+                              : 0.0;
+                          final bool hasStock = kgVal > 0;
 
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.white24),
-                          ),
-                          child: ListTile(
-                            leading: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: crop['image_url'] != null
-                                  ? CachedNetworkImage(
-                                  imageUrl: crop['image_url'],
-                                  width: 55,
-                                  height: 55,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (_, __, ___) =>
-                                  const Icon(Icons.image,
-                                      color: Colors.white))
-                                  : const Icon(Icons.grass,
-                                  color: Colors.green),
-                            ),
-                            title: Text(crop['title'] ?? '',
-                                style: GoogleFonts.poppins(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold)),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                    '${crop['category']} • ${crop['price']}',
+                          return GestureDetector(
+                            // ── Crop pe click → CropDetailScreen ──
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => CropDetailScreen(crop: crop),
+                                ),
+                              );
+                              // Wapas aane par list refresh
+                              setState(() {});
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.white24),
+                              ),
+                              child: ListTile(
+                                leading: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: crop['image_url'] != null
+                                      ? CachedNetworkImage(
+                                      imageUrl: crop['image_url'],
+                                      width: 55,
+                                      height: 55,
+                                      fit: BoxFit.cover,
+                                      errorWidget: (_, __, ___) =>
+                                      const Icon(Icons.image,
+                                          color: Colors.white))
+                                      : const Icon(Icons.grass,
+                                      color: Colors.green),
+                                ),
+                                title: Text(crop['title'] ?? '',
                                     style: GoogleFonts.poppins(
-                                        color: Colors.white70,
-                                        fontSize: 12)),
-                                // ── KG badge shown here ──
-                                if (kgText != null) ...[
-                                  const SizedBox(height: 4),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green
-                                          .withValues(alpha: 0.3),
-                                      borderRadius:
-                                      BorderRadius.circular(6),
-                                      border: Border.all(
-                                          color: Colors.greenAccent
-                                              .withValues(alpha: 0.5)),
-                                    ),
-                                    child: Text('📦 Available: $kgText',
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold)),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                        '${crop['category']} • ${crop['price']}',
                                         style: GoogleFonts.poppins(
-                                            color: Colors.greenAccent,
+                                            color: Colors.white70,
+                                            fontSize: 12)),
+                                    const SizedBox(height: 4),
+                                    // ── KG badge — GREEN if stock, RED if 0 ──
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: hasStock
+                                            ? Colors.green.withValues(alpha: 0.3)
+                                            : Colors.red.withValues(alpha: 0.3),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                            color: hasStock
+                                                ? Colors.greenAccent
+                                                .withValues(alpha: 0.6)
+                                                : Colors.redAccent
+                                                .withValues(alpha: 0.6)),
+                                      ),
+                                      child: Text(
+                                        hasStock
+                                            ? '📦 Available: ${kgVal.toStringAsFixed(1)} KG'
+                                            : '❌ Not Available',
+                                        style: GoogleFonts.poppins(
+                                            color: hasStock
+                                                ? Colors.greenAccent
+                                                : Colors.redAccent,
                                             fontSize: 11,
-                                            fontWeight: FontWeight.w600)),
-                                  ),
-                                ],
-                              ],
+                                            fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.delete,
+                                      color: Colors.redAccent),
+                                  onPressed: () => _deleteCrop(crop['id']),
+                                ),
+                              ),
                             ),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete,
-                                  color: Colors.redAccent),
-                              onPressed: () => _deleteCrop(crop['id']),
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
               ),
             ],
@@ -447,12 +466,11 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
   }
 
   void _showAddCropDialog() {
-    final titleC    = TextEditingController();
+    final titleC = TextEditingController();
     final categoryC = TextEditingController();
-    final priceC    = TextEditingController();
+    final priceC = TextEditingController();
     final locationC = TextEditingController();
-    final imageC    = TextEditingController();
-    // ── NEW: crop quantity in KG ──
+    final imageC = TextEditingController();
     final quantityKgC = TextEditingController();
     bool saving = false;
 
@@ -473,12 +491,12 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                 _dialogField('Category', categoryC, Icons.category),
                 _dialogField('Price', priceC, Icons.attach_money),
                 _dialogField('Location', locationC, Icons.location_on),
-                // ── NEW FIELD ──
                 _dialogField(
                   'Quantity Available (KG)',
                   quantityKgC,
                   Icons.scale_outlined,
-                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
                 ),
                 _dialogField('Image URL (optional)', imageC, Icons.image),
               ],
@@ -501,8 +519,8 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                     priceC.text.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                          content: Text(
-                              'Title, Category, Price required'),
+                          content:
+                          Text('Title, Category, Price required'),
                           backgroundColor: Colors.red));
                   return;
                 }
@@ -518,10 +536,8 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                         : imageC.text.trim(),
                     'seller_type': 'farmer',
                     'seller_name': widget.farmerName,
-                    // ── NEW: save KG quantity ──
-                    'crop_quantity_kg': double.tryParse(
-                        quantityKgC.text.trim()) ??
-                        0,
+                    'crop_quantity_kg':
+                    double.tryParse(quantityKgC.text.trim()) ?? 0,
                   });
                   if (mounted) {
                     Navigator.pop(ctx);
@@ -582,8 +598,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
       setState(() {});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Crop Removed!'),
-            backgroundColor: Colors.red));
+            content: Text('Crop Removed!'), backgroundColor: Colors.red));
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -598,7 +613,6 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ── Stock quantity for shopkeeper items ──
     final stock = product['stock_quantity'];
     final stockText = (stock != null &&
         int.tryParse(stock.toString()) != null &&
@@ -684,8 +698,7 @@ class _ProductCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                              color:
-                              Colors.green.withValues(alpha: 0.3),
+                              color: Colors.green.withValues(alpha: 0.3),
                               borderRadius: BorderRadius.circular(8)),
                           child: Text(product['category'] ?? '',
                               style: GoogleFonts.poppins(
@@ -693,7 +706,6 @@ class _ProductCard extends StatelessWidget {
                                   color: Colors.greenAccent,
                                   fontWeight: FontWeight.w500)),
                         ),
-                        // ── Stock badge ──
                         if (stockText != null) ...[
                           const SizedBox(width: 6),
                           Container(

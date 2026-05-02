@@ -94,10 +94,12 @@ class _CartScreenState extends State<CartScreen> {
 
     try {
       for (final item in cartItems) {
-        // ✅ FIX 1: seller_name aur seller_type null-safe
-        // ✅ FIX 2: seller_type default 'shopkeeper' (farmer sirf shopkeeper se khareedta hai)
-        final orderData = {
-          'product_id'    : item['product_id']?.toString() ?? '',
+        final productId = item['product_id']?.toString().trim() ?? '';
+        final orderedQty = int.tryParse(item['quantity'].toString()) ?? 1;
+
+        // ── 1. Order insert ──
+        await supabase.from('orders').insert({
+          'product_id'    : productId,
           'product_title' : item['product_title'] ?? '',
           'product_price' : item['product_price'] ?? '',
           'seller_name'   : item['seller_name'] ?? '',
@@ -105,18 +107,37 @@ class _CartScreenState extends State<CartScreen> {
           'buyer_name'    : _nameC.text.trim(),
           'buyer_phone'   : _phoneC.text.trim(),
           'buyer_address' : _addressC.text.trim(),
-          'quantity'      : item['quantity'] ?? 1,
+          'quantity'      : orderedQty,
           'status'        : 'pending',
           'created_at'    : DateTime.now().toIso8601String(),
-        };
+        });
 
-        // ✅ DEBUG: console mein dekho kya insert ho raha hai
-        debugPrint('=== INSERTING ORDER ===');
-        debugPrint('seller_name: ${orderData['seller_name']}');
-        debugPrint('seller_type: ${orderData['seller_type']}');
-        debugPrint('product_title: ${orderData['product_title']}');
+        // ── 2. stock_quantity deduct (Supabase RPC se — UUID issue fix) ──
+        if (productId.isNotEmpty) {
+          try {
+            // Current stock fetch karo
+            final res = await supabase
+                .from('products')
+                .select('stock_quantity')
+                .filter('id', 'eq', productId)
+                .maybeSingle();
 
-        await supabase.from('orders').insert(orderData);
+            if (res != null && res['stock_quantity'] != null) {
+              final currentStock = int.tryParse(res['stock_quantity'].toString()) ?? 0;
+              final newStock = (currentStock - orderedQty).clamp(0, 999999);
+
+              await supabase
+                  .from('products')
+                  .update({'stock_quantity': newStock})
+                  .filter('id', 'eq', productId);
+
+              debugPrint('✅ Stock updated: $currentStock → $newStock for $productId');
+            }
+          } catch (stockErr) {
+            debugPrint('⚠️ Stock deduct error: $stockErr');
+            // Order cancel nahi hoga agar stock update fail ho
+          }
+        }
       }
 
       await clearCart();
@@ -170,7 +191,6 @@ class _CartScreenState extends State<CartScreen> {
       }
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
