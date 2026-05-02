@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:argichain/screens/farmer/cart_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // ← for Clipboard
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -29,7 +30,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     super.initState();
     _fadeCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 500));
-    _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeIn);
+    _fadeAnim =
+        CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeIn);
     _fadeCtrl.forward();
 
     final stock = widget.product['stock_quantity'];
@@ -55,13 +57,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     }
     try {
       await supabase.from('farmer_cart').insert({
-        'product_id':    widget.product['id'],
+        'product_id': widget.product['id'],
         'product_title': widget.product['title'],
         'product_price': widget.product['price'],
         'product_image': widget.product['image_url'],
-        'seller_name':   widget.product['seller_name'],
-        'seller_type':   widget.product['seller_type'],
-        'quantity':      _selectedQty,
+        'seller_name': widget.product['seller_name'],
+        'seller_type': widget.product['seller_type'],
+        'quantity': _selectedQty,
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -76,12 +78,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                 GestureDetector(
                   onTap: () {
                     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                    Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => const CartScreen()));
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const CartScreen()));
                   },
                   child: Text('View Cart',
                       style: GoogleFonts.poppins(
-                          color: Colors.yellow, fontWeight: FontWeight.bold)),
+                          color: Colors.yellow,
+                          fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -126,7 +131,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     final sellerPhone = widget.product['seller_phone'] ?? '';
     final message = Uri.encodeComponent(
         'Hello! I am interested in "$title" priced at $price. I want to order $_selectedQty unit(s).');
-    final cleanPhone = sellerPhone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+    final cleanPhone =
+    sellerPhone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
     final Uri uri = cleanPhone.isNotEmpty
         ? Uri.parse('https://wa.me/$cleanPhone?text=$message')
         : Uri.parse('https://wa.me/?text=$message');
@@ -141,9 +147,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
       body: Stack(
         children: [
           SizedBox.expand(
-              child: Image.asset('assets/images/DF.jpg', fit: BoxFit.cover)),
+              child:
+              Image.asset('assets/images/DF.jpg', fit: BoxFit.cover)),
           SizedBox.expand(
-              child: Container(color: Colors.black.withValues(alpha: 0.70))),
+              child: Container(
+                  color: Colors.black.withValues(alpha: 0.70))),
           SafeArea(
             child: FadeTransition(
               opacity: _fadeAnim,
@@ -159,14 +167,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     final p = widget.product;
     final bool isOutOfStock = _maxStock <= 0;
 
+    final String paymentMethod = (p['payment_method'] ?? '').toString().trim();
+    final String paymentAccount = (p['payment_account'] ?? '').toString().trim();
+    final bool hasPaymentAccount =
+        paymentAccount.isNotEmpty && paymentMethod.isNotEmpty;
+
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+                icon: const Icon(Icons.arrow_back_ios_new,
+                    color: Colors.white),
                 onPressed: () => Navigator.pop(context),
               ),
               Expanded(
@@ -178,8 +193,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                     overflow: TextOverflow.ellipsis),
               ),
               GestureDetector(
-                onTap: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const CartScreen())),
+                onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const CartScreen())),
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -201,6 +218,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ── Hero Image ──
                 Stack(
                   children: [
                     ClipRRect(
@@ -220,8 +238,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                           errorWidget: (_, __, ___) => Container(
                               height: 220,
                               color: Colors.grey.shade800,
-                              child: const Icon(Icons.image_not_supported,
-                                  color: Colors.white54, size: 60)))
+                              child: const Icon(
+                                  Icons.image_not_supported,
+                                  color: Colors.white54,
+                                  size: 60)))
                           : Container(
                           height: 220,
                           color: Colors.grey.shade800,
@@ -335,11 +355,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                     title: 'Description',
                     value: p['description'] ?? 'No description available.'),
                 const SizedBox(height: 10),
-                _infoCard(
-                    icon: Icons.payment,
-                    title: 'Payment Method',
-                    value: p['payment_method'] ?? 'Not specified'),
+
+                // ── Payment Method Card — always shown ──
+                _paymentCard(
+                  method: paymentMethod,
+                  account: paymentAccount,
+                  hasAccount: hasPaymentAccount,
+                ),
                 const SizedBox(height: 10),
+
                 _sellerCard(p),
                 const SizedBox(height: 24),
 
@@ -356,10 +380,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                                   color: Colors.yellow,
                                   fontWeight: FontWeight.w600)),
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Colors.yellow),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            side: const BorderSide(
+                                color: Colors.yellow),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 14),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14)),
+                                borderRadius:
+                                BorderRadius.circular(14)),
                           ),
                         ),
                       ),
@@ -375,9 +402,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                                   fontWeight: FontWeight.bold)),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 14),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14)),
+                                borderRadius:
+                                BorderRadius.circular(14)),
                           ),
                         ),
                       ),
@@ -390,14 +419,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: _openWhatsApp,
-                    icon: const Icon(Icons.chat, color: Colors.greenAccent),
+                    icon: const Icon(Icons.chat,
+                        color: Colors.greenAccent),
                     label: Text('Contact Seller on WhatsApp',
                         style: GoogleFonts.poppins(
                             color: Colors.greenAccent,
                             fontWeight: FontWeight.w600)),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.greenAccent),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side:
+                      const BorderSide(color: Colors.greenAccent),
+                      padding:
+                      const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14)),
                     ),
@@ -412,6 +444,135 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     );
   }
 
+  // ── Payment Card — FIXED: always shows, clipboard actually copies ─────────
+  Widget _paymentCard(
+      {required String method,
+        required String account,
+        required bool hasAccount}) {
+    if (method.isEmpty) {
+      return _infoCard(
+          icon: Icons.payment,
+          title: 'Payment Method',
+          value: 'Not specified');
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.yellow.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+                color: Colors.yellow.withValues(alpha: 0.4)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.payment,
+                      color: Colors.yellow, size: 18),
+                  const SizedBox(width: 8),
+                  Text('Payment Method',
+                      style: GoogleFonts.poppins(
+                          color: Colors.yellow,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.yellow.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                      color: Colors.yellow.withValues(alpha: 0.5)),
+                ),
+                child: Text(method,
+                    style: GoogleFonts.poppins(
+                        color: Colors.yellow,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600)),
+              ),
+              if (hasAccount) ...[
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Account Number',
+                          style: GoogleFonts.poppins(
+                              color: Colors.white54, fontSize: 11)),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(account,
+                                style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.2)),
+                          ),
+                          // ── FIXED: actually copies to clipboard ──
+                          GestureDetector(
+                            onTap: () {
+                              Clipboard.setData(
+                                  ClipboardData(text: account));
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(
+                                SnackBar(
+                                    content: Text(
+                                        'Account number copied! 📋',
+                                        style: GoogleFonts.poppins()),
+                                    backgroundColor:
+                                    Colors.green.shade700,
+                                    duration:
+                                    const Duration(seconds: 2)),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.white
+                                    .withValues(alpha: 0.1),
+                                borderRadius:
+                                BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.copy,
+                                  color: Colors.white60, size: 16),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '⚠️ Payment karne ke baad screenshot zaroor bhejein',
+                  style: GoogleFonts.poppins(
+                      color: Colors.white54, fontSize: 11),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _stockCard() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
@@ -422,8 +583,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
           decoration: BoxDecoration(
             color: Colors.blue.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(14),
-            border:
-            Border.all(color: Colors.lightBlueAccent.withValues(alpha: 0.4)),
+            border: Border.all(
+                color: Colors.lightBlueAccent.withValues(alpha: 0.4)),
           ),
           child: Row(
             children: [
@@ -502,8 +663,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                           fontWeight: FontWeight.w600)),
                   const Spacer(),
                   Text('Max: $_maxStock',
-                      style:
-                      GoogleFonts.poppins(color: Colors.white54, fontSize: 12)),
+                      style: GoogleFonts.poppins(
+                          color: Colors.white54, fontSize: 12)),
                 ],
               ),
               const SizedBox(height: 14),
@@ -512,7 +673,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                 children: [
                   GestureDetector(
                     onTap: () {
-                      if (_selectedQty > 1) setState(() => _selectedQty--);
+                      if (_selectedQty > 1)
+                        setState(() => _selectedQty--);
                     },
                     child: Container(
                       width: 44,
@@ -522,8 +684,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.white24),
                       ),
-                      child:
-                      const Icon(Icons.remove, color: Colors.white, size: 20),
+                      child: const Icon(Icons.remove,
+                          color: Colors.white, size: 20),
                     ),
                   ),
                   Container(
@@ -551,7 +713,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                              content: Text('Maximum $_maxStock units available!'),
+                              content: Text(
+                                  'Maximum $_maxStock units available!'),
                               backgroundColor: Colors.orange),
                         );
                       }
@@ -563,7 +726,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                         color: Colors.green.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                            color: Colors.greenAccent.withValues(alpha: 0.5)),
+                            color: Colors.greenAccent
+                                .withValues(alpha: 0.5)),
                       ),
                       child: const Icon(Icons.add,
                           color: Colors.greenAccent, size: 20),
@@ -574,23 +738,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
               const SizedBox(height: 10),
               if (_maxStock >= 5) ...[
                 Text('Quick Select:',
-                    style:
-                    GoogleFonts.poppins(color: Colors.white54, fontSize: 11)),
+                    style: GoogleFonts.poppins(
+                        color: Colors.white54, fontSize: 11)),
                 const SizedBox(height: 6),
                 Wrap(
                   spacing: 8,
                   children: [1, 2, 5, 10]
                       .where((v) => v <= _maxStock)
                       .map((v) => GestureDetector(
-                    onTap: () => setState(() => _selectedQty = v),
+                    onTap: () =>
+                        setState(() => _selectedQty = v),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(
                         color: _selectedQty == v
                             ? Colors.green
-                            : Colors.white.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
+                            : Colors.white
+                            .withValues(alpha: 0.1),
+                        borderRadius:
+                        BorderRadius.circular(20),
                         border: Border.all(
                           color: _selectedQty == v
                               ? Colors.greenAccent
@@ -603,7 +770,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                                   ? Colors.white
                                   : Colors.white60,
                               fontSize: 12,
-                              fontWeight: FontWeight.w600)),
+                              fontWeight:
+                              FontWeight.w600)),
                     ),
                   ))
                       .toList(),
@@ -622,11 +790,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
       decoration: BoxDecoration(
         color: Colors.red.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
+        border:
+        Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.cancel_outlined, color: Colors.redAccent, size: 22),
+          const Icon(Icons.cancel_outlined,
+              color: Colors.redAccent, size: 22),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -637,9 +807,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                         color: Colors.redAccent,
                         fontWeight: FontWeight.bold,
                         fontSize: 14)),
-                Text('This item is currently unavailable. Contact seller.',
-                    style:
-                    GoogleFonts.poppins(color: Colors.white54, fontSize: 11)),
+                Text(
+                    'This item is currently unavailable. Contact seller.',
+                    style: GoogleFonts.poppins(
+                        color: Colors.white54, fontSize: 11)),
               ],
             ),
           ),
@@ -649,7 +820,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
   }
 
   Widget _infoCard(
-      {required IconData icon, required String title, required String value}) {
+      {required IconData icon,
+        required String title,
+        required String value}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: BackdropFilter(
@@ -677,8 +850,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                             fontWeight: FontWeight.w500)),
                     const SizedBox(height: 2),
                     Text(value,
-                        style:
-                        GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                        style: GoogleFonts.poppins(
+                            color: Colors.white, fontSize: 13)),
                   ],
                 ),
               ),
@@ -699,7 +872,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
           decoration: BoxDecoration(
             color: Colors.green.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.green.withValues(alpha: 0.4)),
+            border: Border.all(
+                color: Colors.green.withValues(alpha: 0.4)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -717,8 +891,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                 ],
               ),
               const SizedBox(height: 10),
-              _sellerRow(
-                  Icons.person_outline, 'Name', p['seller_name'] ?? 'N/A'),
+              _sellerRow(Icons.person_outline, 'Name',
+                  p['seller_name'] ?? 'N/A'),
               const SizedBox(height: 6),
               _sellerRow(Icons.location_on_outlined, 'Location',
                   p['location'] ?? 'N/A'),
@@ -735,7 +909,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
         Icon(icon, color: Colors.white60, size: 15),
         const SizedBox(width: 6),
         Text('$label: ',
-            style: GoogleFonts.poppins(color: Colors.white60, fontSize: 12)),
+            style: GoogleFonts.poppins(
+                color: Colors.white60, fontSize: 12)),
         Flexible(
             child: Text(value,
                 style: GoogleFonts.poppins(
@@ -747,9 +922,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
   }
 }
 
-// ════════════════════════════════════════════════════════════════
-//  BUY NOW SCREEN — Image 1 style (dark navy card)
-// ════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════════════
+//  BUY NOW SCREEN — FIXED: payment method always visible
+// ════════════════════════════════════════════════════════════════════════════
 class BuyNowScreen extends StatefulWidget {
   final Map<String, dynamic> product;
   final int selectedQty;
@@ -797,18 +972,18 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
 
     try {
       await supabase.from('orders').insert({
-        'product_id':     widget.product['id']?.toString().trim() ?? '',
-        'product_title':  widget.product['title'] ?? '',
-        'product_price':  widget.product['price'] ?? '',
-        'seller_name':    widget.product['seller_name'] ?? '',
-        'seller_type':    widget.product['seller_type'] ?? 'shopkeeper',
-        'buyer_name':     nameC.text.trim(),
-        'buyer_phone':    phoneC.text.trim(),
-        'buyer_address':  addressC.text.trim(),
+        'product_id': widget.product['id']?.toString().trim() ?? '',
+        'product_title': widget.product['title'] ?? '',
+        'product_price': widget.product['price'] ?? '',
+        'seller_name': widget.product['seller_name'] ?? '',
+        'seller_type': widget.product['seller_type'] ?? 'shopkeeper',
+        'buyer_name': nameC.text.trim(),
+        'buyer_phone': phoneC.text.trim(),
+        'buyer_address': addressC.text.trim(),
         'payment_method': widget.product['payment_method'] ?? 'Not specified',
-        'quantity':       widget.selectedQty,
-        'status':         'pending',
-        'created_at':     DateTime.now().toIso8601String(),
+        'quantity': widget.selectedQty,
+        'status': 'pending',
+        'created_at': DateTime.now().toIso8601String(),
       });
 
       final productId = widget.product['id']?.toString().trim() ?? '';
@@ -823,11 +998,12 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
           if (res != null && res['stock_quantity'] != null) {
             final currentStock =
                 int.tryParse(res['stock_quantity'].toString()) ?? 0;
-            newStock = (currentStock - widget.selectedQty).clamp(0, 999999);
+            newStock =
+                (currentStock - widget.selectedQty).clamp(0, 999999);
             await supabase
                 .from('products')
-                .update({'stock_quantity': newStock})
-                .filter('id', 'eq', productId);
+                .update({'stock_quantity': newStock}).filter(
+                'id', 'eq', productId);
           }
         } catch (stockErr) {
           debugPrint('Stock deduct error: $stockErr');
@@ -843,8 +1019,8 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
       }
     } catch (e) {
       setState(() => _placing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: $e'), backgroundColor: Colors.red));
     }
   }
 
@@ -854,11 +1030,13 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
       barrierDismissible: false,
       builder: (_) => AlertDialog(
         backgroundColor: Colors.grey.shade900,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 70),
+            const Icon(Icons.check_circle,
+                color: Colors.green, size: 70),
             const SizedBox(height: 16),
             Text('Order Placed!',
                 style: GoogleFonts.poppins(
@@ -872,7 +1050,8 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
                     color: Colors.white60, fontSize: 13)),
             const SizedBox(height: 20),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green),
               onPressed: () {
                 Navigator.pop(context);
                 Navigator.pop(context);
@@ -889,21 +1068,29 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
   @override
   Widget build(BuildContext context) {
     final p = widget.product;
+    // ── FIXED: trim to avoid empty-string false negatives ──
+    final String paymentMethod =
+    (p['payment_method'] ?? '').toString().trim();
+    final String paymentAccount =
+    (p['payment_account'] ?? '').toString().trim();
+    final bool hasAccount =
+        paymentAccount.isNotEmpty && paymentMethod.isNotEmpty;
 
     return Scaffold(
       body: Stack(
         children: [
           SizedBox.expand(
-              child: Image.asset('assets/images/DF.jpg', fit: BoxFit.cover)),
+              child: Image.asset('assets/images/DF.jpg',
+                  fit: BoxFit.cover)),
           SizedBox.expand(
-              child: Container(color: Colors.black.withValues(alpha: 0.75))),
+              child: Container(
+                  color: Colors.black.withValues(alpha: 0.75))),
           SafeArea(
             child: Column(
               children: [
-                // ── App Bar ──
                 Padding(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
                   child: Row(
                     children: [
                       IconButton(
@@ -911,7 +1098,7 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
                             color: Colors.white),
                         onPressed: () => Navigator.pop(context),
                       ),
-                      Text('Your Details',
+                      Text('Checkout',
                           style: GoogleFonts.poppins(
                               color: Colors.white,
                               fontSize: 20,
@@ -922,79 +1109,63 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
 
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-
-                        // ── Product Summary Card — Image 1 style ──
+                        // ── Product Summary Card ──
                         Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            // ← dark navy blue — same as Image 1
                             color: const Color(0xFF1A2535),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.12)),
+                                color: Colors.white
+                                    .withValues(alpha: 0.12)),
                           ),
                           child: Row(
                             children: [
-                              // ── Product Image ──
                               ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius:
+                                BorderRadius.circular(10),
                                 child: p['image_url'] != null
                                     ? CachedNetworkImage(
                                     imageUrl: p['image_url'],
                                     width: 64,
                                     height: 64,
-                                    fit: BoxFit.cover,
-                                    placeholder: (_, __) => Container(
-                                        width: 64,
-                                        height: 64,
-                                        color: const Color(0xFF0D1B2A),
-                                        child: const Icon(Icons.image,
-                                            color: Colors.white38)),
-                                    errorWidget: (_, __, ___) => Container(
-                                        width: 64,
-                                        height: 64,
-                                        color: const Color(0xFF0D1B2A),
-                                        child: const Icon(
-                                            Icons.image_not_supported,
-                                            color: Colors.white38)))
+                                    fit: BoxFit.cover)
                                     : Container(
                                     width: 64,
                                     height: 64,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF0D1B2A),
-                                      borderRadius:
-                                      BorderRadius.circular(10),
-                                    ),
+                                    color: const Color(0xFF0D1B2A),
                                     child: const Icon(Icons.image,
                                         color: Colors.white38)),
                               ),
                               const SizedBox(width: 14),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  crossAxisAlignment:
+                                  CrossAxisAlignment.start,
                                   children: [
-                                    // Title
                                     Text(p['title'] ?? '',
                                         style: GoogleFonts.poppins(
                                             color: Colors.white,
-                                            fontWeight: FontWeight.bold,
+                                            fontWeight:
+                                            FontWeight.bold,
                                             fontSize: 15)),
                                     const SizedBox(height: 4),
-                                    // Price — green
                                     Text(p['price'] ?? '',
                                         style: GoogleFonts.poppins(
                                             color: Colors.greenAccent,
                                             fontWeight: FontWeight.w600,
                                             fontSize: 14)),
                                     const SizedBox(height: 6),
-                                    // Units badge — green outline
                                     Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 4),
+                                      padding:
+                                      const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4),
                                       decoration: BoxDecoration(
                                         color: Colors.green
                                             .withValues(alpha: 0.15),
@@ -1009,7 +1180,8 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
                                         style: GoogleFonts.poppins(
                                             color: Colors.greenAccent,
                                             fontSize: 11,
-                                            fontWeight: FontWeight.w600),
+                                            fontWeight:
+                                            FontWeight.w600),
                                       ),
                                     ),
                                   ],
@@ -1019,9 +1191,178 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
                           ),
                         ),
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 16),
 
-                        // ── Enter Your Details ──
+                        // ── Payment Info Card — ALWAYS shown if method exists ──
+                        if (paymentMethod.isNotEmpty) ...[
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.yellow
+                                  .withValues(alpha: 0.08),
+                              borderRadius:
+                              BorderRadius.circular(14),
+                              border: Border.all(
+                                  color: Colors.yellow
+                                      .withValues(alpha: 0.4)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                              children: [
+                                Row(children: [
+                                  const Icon(Icons.payment,
+                                      color: Colors.yellow, size: 16),
+                                  const SizedBox(width: 6),
+                                  Text('💳 Payment Method',
+                                      style: GoogleFonts.poppins(
+                                          color: Colors.yellow,
+                                          fontSize: 13,
+                                          fontWeight:
+                                          FontWeight.bold)),
+                                ]),
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding:
+                                  const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.yellow
+                                        .withValues(alpha: 0.15),
+                                    borderRadius:
+                                    BorderRadius.circular(20),
+                                    border: Border.all(
+                                        color: Colors.yellow
+                                            .withValues(alpha: 0.5)),
+                                  ),
+                                  child: Text(paymentMethod,
+                                      style: GoogleFonts.poppins(
+                                          color: Colors.yellow,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600)),
+                                ),
+                                if (hasAccount) ...[
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white
+                                          .withValues(alpha: 0.05),
+                                      borderRadius:
+                                      BorderRadius.circular(12),
+                                      border: Border.all(
+                                          color: Colors.white24),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                      children: [
+                                        Text('Account Number',
+                                            style: GoogleFonts.poppins(
+                                                color: Colors.white54,
+                                                fontSize: 11)),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                  paymentAccount,
+                                                  style: GoogleFonts
+                                                      .poppins(
+                                                      color: Colors
+                                                          .white,
+                                                      fontSize: 16,
+                                                      fontWeight:
+                                                      FontWeight
+                                                          .bold,
+                                                      letterSpacing:
+                                                      1.2)),
+                                            ),
+                                            // ── Copy button ──
+                                            GestureDetector(
+                                              onTap: () {
+                                                Clipboard.setData(
+                                                    ClipboardData(
+                                                        text:
+                                                        paymentAccount));
+                                                ScaffoldMessenger.of(
+                                                    context)
+                                                    .showSnackBar(SnackBar(
+                                                  content: Text(
+                                                      'Copied! 📋',
+                                                      style: GoogleFonts
+                                                          .poppins()),
+                                                  backgroundColor:
+                                                  Colors.green
+                                                      .shade700,
+                                                  duration:
+                                                  const Duration(
+                                                      seconds: 2),
+                                                ));
+                                              },
+                                              child: Container(
+                                                padding:
+                                                const EdgeInsets
+                                                    .all(6),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white
+                                                      .withValues(
+                                                      alpha: 0.1),
+                                                  borderRadius:
+                                                  BorderRadius
+                                                      .circular(8),
+                                                ),
+                                                child: const Icon(
+                                                    Icons.copy,
+                                                    color:
+                                                    Colors.white60,
+                                                    size: 16),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '⚠️ Payment karne ke baad screenshot send karein',
+                                    style: GoogleFonts.poppins(
+                                        color: Colors.white54,
+                                        fontSize: 11),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ] else ...[
+                          // No payment method — show plain info
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white
+                                  .withValues(alpha: 0.06),
+                              borderRadius:
+                              BorderRadius.circular(12),
+                              border: Border.all(color: Colors.white24),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.payment,
+                                    color: Colors.white54, size: 16),
+                                const SizedBox(width: 8),
+                                Text('Payment: Cash / On Delivery',
+                                    style: GoogleFonts.poppins(
+                                        color: Colors.white60,
+                                        fontSize: 13)),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+
                         Text('Enter Your Details',
                             style: GoogleFonts.poppins(
                                 color: Colors.yellow,
@@ -1029,46 +1370,20 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
                                 fontWeight: FontWeight.bold)),
                         const SizedBox(height: 12),
 
-                        _field('Your Name', nameC, Icons.person_outline),
+                        _field('Your Name', nameC,
+                            Icons.person_outline),
                         const SizedBox(height: 12),
 
-                        _field('Phone Number', phoneC, Icons.phone_outlined,
+                        _field('Phone Number', phoneC,
+                            Icons.phone_outlined,
                             type: TextInputType.phone),
                         const SizedBox(height: 12),
 
                         _field('Delivery Address', addressC,
                             Icons.location_on_outlined,
                             maxLines: 3),
-                        const SizedBox(height: 16),
-
-                        // ── Payment info ──
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: Colors.yellow.withValues(alpha: 0.10),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                                color: Colors.yellow.withValues(alpha: 0.4)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.credit_card,
-                                  color: Colors.yellow, size: 18),
-                              const SizedBox(width: 10),
-                              Flexible(
-                                child: Text(
-                                  'Payment: ${p['payment_method'] ?? 'Ask the seller'}',
-                                  style: GoogleFonts.poppins(
-                                      color: Colors.yellow, fontSize: 13),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
                         const SizedBox(height: 24),
 
-                        // ── Place Order Button ──
                         SizedBox(
                           width: double.infinity,
                           height: 54,
@@ -1077,19 +1392,22 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16)),
+                                  borderRadius:
+                                  BorderRadius.circular(16)),
                             ),
                             child: _placing
                                 ? const SizedBox(
                                 width: 24,
                                 height: 24,
                                 child: CircularProgressIndicator(
-                                    color: Colors.white, strokeWidth: 2.5))
+                                    color: Colors.white,
+                                    strokeWidth: 2.5))
                                 : Text('Place Order',
                                 style: GoogleFonts.poppins(
                                     color: Colors.white,
                                     fontSize: 16,
-                                    fontWeight: FontWeight.bold)),
+                                    fontWeight:
+                                    FontWeight.bold)),
                           ),
                         ),
                         const SizedBox(height: 30),
@@ -1117,15 +1435,15 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
         labelStyle: GoogleFonts.poppins(color: Colors.white60),
         prefixIcon: Icon(icon, color: Colors.greenAccent),
         filled: true,
-        // ← dark navy fill — same as Image 1
         fillColor: const Color(0xFF1A2535),
         enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide:
-            BorderSide(color: Colors.white.withValues(alpha: 0.12))),
+            borderSide: BorderSide(
+                color: Colors.white.withValues(alpha: 0.12))),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Colors.greenAccent)),
+            borderSide:
+            const BorderSide(color: Colors.greenAccent)),
       ),
     );
   }

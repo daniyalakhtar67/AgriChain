@@ -17,8 +17,34 @@ class _ShopkeeperDashboardState extends State<ShopkeeperDashboard> {
   final supabase = Supabase.instance.client;
   int _currentIndex = 0;
 
+  // Profile editable state — shared across tabs
+  late String _displayName;
+  String _shopPhone    = '';
+  String _shopLocation = '';
+  String _shopDesc     = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _displayName = widget.shopkeeperName;
+  }
+
   void _logout() {
     Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
+  }
+
+  void _onProfileUpdated({
+    required String name,
+    required String phone,
+    required String location,
+    required String desc,
+  }) {
+    setState(() {
+      _displayName  = name;
+      _shopPhone    = phone;
+      _shopLocation = location;
+      _shopDesc     = desc;
+    });
   }
 
   @override
@@ -27,9 +53,16 @@ class _ShopkeeperDashboardState extends State<ShopkeeperDashboard> {
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          _SellItemsTab(shopkeeperName: widget.shopkeeperName),
-          _OrdersTab(shopkeeperName: widget.shopkeeperName),
-          _ProfileTab(shopkeeperName: widget.shopkeeperName, onLogout: _logout),
+          _SellItemsTab(shopkeeperName: _displayName),
+          _OrdersTab(shopkeeperName: _displayName),
+          _ProfileTab(
+            shopkeeperName: _displayName,
+            shopPhone: _shopPhone,
+            shopLocation: _shopLocation,
+            shopDesc: _shopDesc,
+            onLogout: _logout,
+            onProfileUpdated: _onProfileUpdated,
+          ),
         ],
       ),
       bottomNavigationBar: Container(
@@ -51,7 +84,8 @@ class _ShopkeeperDashboardState extends State<ShopkeeperDashboard> {
           type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.transparent,
           elevation: 0,
-          selectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 11),
+          selectedLabelStyle:
+          GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 11),
           unselectedLabelStyle: GoogleFonts.poppins(fontSize: 11),
           items: const [
             BottomNavigationBarItem(
@@ -81,7 +115,7 @@ class _ShopkeeperDashboardState extends State<ShopkeeperDashboard> {
 }
 
 // ─────────────────────────────────────────────
-// TAB 1 — SELL ITEMS
+// TAB 1 — SELL ITEMS  (unchanged)
 // ─────────────────────────────────────────────
 class _SellItemsTab extends StatefulWidget {
   final String shopkeeperName;
@@ -126,13 +160,15 @@ class _SellItemsTabState extends State<_SellItemsTab> {
       fetchMyItems();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Item removed!'), backgroundColor: Colors.red),
+          const SnackBar(
+              content: Text('Item removed!'), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(
+              content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -155,9 +191,12 @@ class _SellItemsTabState extends State<_SellItemsTab> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
           backgroundColor: Colors.grey.shade900,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20)),
           title: Text('Add New Item',
-              style: GoogleFonts.poppins(color: Colors.greenAccent, fontWeight: FontWeight.bold)),
+              style: GoogleFonts.poppins(
+                  color: Colors.greenAccent,
+                  fontWeight: FontWeight.bold)),
           content: SingleChildScrollView(
             child: Column(
               children: [
@@ -165,11 +204,14 @@ class _SellItemsTabState extends State<_SellItemsTab> {
                 _dialogField('Category *', categoryC, Icons.category),
                 _dialogField('Price *', priceC, Icons.attach_money),
                 _dialogField('Location', locationC, Icons.location_on),
-                _dialogField('Description', descC, Icons.description, maxLines: 2),
+                _dialogField('Description', descC, Icons.description,
+                    maxLines: 2),
                 _dialogField('Payment Method', paymentC, Icons.payment),
-                _dialogField('WhatsApp Number (923XXXXXXXXX)', phoneC, Icons.phone,
+                _dialogField('WhatsApp Number (923XXXXXXXXX)', phoneC,
+                    Icons.phone,
                     keyType: TextInputType.phone),
-                _dialogField('Stock Quantity', stockC, Icons.inventory_2_outlined,
+                _dialogField('Stock Quantity', stockC,
+                    Icons.inventory_2_outlined,
                     keyType: TextInputType.number),
                 _dialogField('Image URL (optional)', imageC, Icons.image),
               ],
@@ -178,17 +220,22 @@ class _SellItemsTabState extends State<_SellItemsTab> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.white60)),
+              child: Text('Cancel',
+                  style: GoogleFonts.poppins(color: Colors.white60)),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              style:
+              ElevatedButton.styleFrom(backgroundColor: Colors.green),
               onPressed: saving
                   ? null
                   : () async {
-                if (titleC.text.isEmpty || categoryC.text.isEmpty || priceC.text.isEmpty) {
+                if (titleC.text.isEmpty ||
+                    categoryC.text.isEmpty ||
+                    priceC.text.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content: Text('Title, Category, Price zaroori hain!'),
+                        content: Text(
+                            'Title, Category, Price zaroori hain!'),
                         backgroundColor: Colors.red),
                   );
                   return;
@@ -204,28 +251,39 @@ class _SellItemsTabState extends State<_SellItemsTab> {
                     'payment_method': paymentC.text.trim(),
                     'seller_phone': phoneC.text.trim(),
                     'seller_name': widget.shopkeeperName,
-                    'image_url': imageC.text.trim().isEmpty ? null : imageC.text.trim(),
+                    'image_url': imageC.text.trim().isEmpty
+                        ? null
+                        : imageC.text.trim(),
                     'seller_type': 'shopkeeper',
-                    'stock_quantity': int.tryParse(stockC.text.trim()) ?? 0,
+                    'stock_quantity':
+                    int.tryParse(stockC.text.trim()) ?? 0,
                   });
                   if (mounted) {
                     Navigator.pop(ctx);
                     fetchMyItems();
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Item Added! ✅'), backgroundColor: Colors.green),
+                      const SnackBar(
+                          content: Text('Item Added! ✅'),
+                          backgroundColor: Colors.green),
                     );
                   }
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                    SnackBar(
+                        content: Text('Error: $e'),
+                        backgroundColor: Colors.red),
                   );
                 }
                 setS(() => saving = false);
               },
               child: saving
-                  ? const SizedBox(width: 20, height: 20,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : Text('Add', style: GoogleFonts.poppins(color: Colors.white)),
+                  ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      color: Colors.white, strokeWidth: 2))
+                  : Text('Add',
+                  style: GoogleFonts.poppins(color: Colors.white)),
             ),
           ],
         ),
@@ -244,14 +302,17 @@ class _SellItemsTabState extends State<_SellItemsTab> {
         style: const TextStyle(color: Colors.white),
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: GoogleFonts.poppins(color: Colors.greenAccent, fontSize: 12),
-          prefixIcon: Icon(icon, color: Colors.greenAccent, size: 18),
+          labelStyle:
+          GoogleFonts.poppins(color: Colors.greenAccent, fontSize: 12),
+          prefixIcon:
+          Icon(icon, color: Colors.greenAccent, size: 18),
           enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Colors.white24)),
           focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.greenAccent)),
+              borderSide:
+              const BorderSide(color: Colors.greenAccent)),
           filled: true,
           fillColor: Colors.white.withValues(alpha: 0.05),
         ),
@@ -263,34 +324,52 @@ class _SellItemsTabState extends State<_SellItemsTab> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        SizedBox.expand(child: Image.asset('assets/images/DS.jpg', fit: BoxFit.cover)),
-        SizedBox.expand(child: Container(color: Colors.black.withValues(alpha: 0.70))),
+        SizedBox.expand(
+            child: Image.asset('assets/images/DS.jpg', fit: BoxFit.cover)),
+        SizedBox.expand(
+            child:
+            Container(color: Colors.black.withValues(alpha: 0.70))),
         SafeArea(
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 14),
                 child: Row(
                   children: [
                     Expanded(
                       child: RichText(
                         text: TextSpan(children: [
-                          TextSpan(text: 'My ',
-                              style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
-                          TextSpan(text: 'Items',
-                              style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
+                          TextSpan(
+                              text: 'My ',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white)),
+                          TextSpan(
+                              text: 'Items',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.greenAccent)),
                         ]),
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: Colors.green.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.5)),
+                        border: Border.all(
+                            color:
+                            Colors.greenAccent.withValues(alpha: 0.5)),
                       ),
                       child: Text('${myItems.length} items',
-                          style: GoogleFonts.poppins(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.w600)),
+                          style: GoogleFonts.poppins(
+                              color: Colors.greenAccent,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600)),
                     ),
                     const SizedBox(width: 10),
                     GestureDetector(
@@ -301,7 +380,8 @@ class _SellItemsTabState extends State<_SellItemsTab> {
                           color: Colors.green,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.add, color: Colors.white, size: 22),
+                        child: const Icon(Icons.add,
+                            color: Colors.white, size: 22),
                       ),
                     ),
                   ],
@@ -309,41 +389,51 @@ class _SellItemsTabState extends State<_SellItemsTab> {
               ),
               Expanded(
                 child: isLoading
-                    ? const Center(child: CircularProgressIndicator(color: Colors.green))
+                    ? const Center(
+                    child: CircularProgressIndicator(
+                        color: Colors.green))
                     : myItems.isEmpty
                     ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.store_outlined, color: Colors.white24, size: 80),
+                      const Icon(Icons.store_outlined,
+                          color: Colors.white24, size: 80),
                       const SizedBox(height: 16),
                       Text('Koi item nahi hai abhi',
-                          style: GoogleFonts.poppins(color: Colors.white60, fontSize: 16)),
+                          style: GoogleFonts.poppins(
+                              color: Colors.white60,
+                              fontSize: 16)),
                       const SizedBox(height: 8),
-                      Text('+ button dabao aur item add karo',
-                          style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)),
+                      Text(
+                          '+ button dabao aur item add karo',
+                          style: GoogleFonts.poppins(
+                              color: Colors.white38,
+                              fontSize: 13)),
                     ],
                   ),
                 )
                     : RefreshIndicator(
                   onRefresh: fetchMyItems,
                   child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16),
                     itemCount: myItems.length,
                     itemBuilder: (context, index) {
                       final item = myItems[index];
                       return _ItemCard(
                         item: item,
-                        onDelete: () => deleteItem(item['id']),
+                        onDelete: () =>
+                            deleteItem(item['id']),
                         onTap: () async {
-                          // ── Detail screen open karo ──
                           await Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => _ShopkeeperItemDetail(item: item),
+                              builder: (_) =>
+                                  _ShopkeeperItemDetail(
+                                      item: item),
                             ),
                           );
-                          // Wapas aane pe refresh karo
                           fetchMyItems();
                         },
                       );
@@ -366,7 +456,10 @@ class _ItemCard extends StatelessWidget {
   final Map<String, dynamic> item;
   final VoidCallback onDelete;
   final VoidCallback onTap;
-  const _ItemCard({required this.item, required this.onDelete, required this.onTap});
+  const _ItemCard(
+      {required this.item,
+        required this.onDelete,
+        required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -387,35 +480,45 @@ class _ItemCard extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16), bottomLeft: Radius.circular(16)),
+                  topLeft: Radius.circular(16),
+                  bottomLeft: Radius.circular(16)),
               child: item['image_url'] != null
                   ? CachedNetworkImage(
                   imageUrl: item['image_url'],
-                  width: 95, height: 95, fit: BoxFit.cover,
+                  width: 95,
+                  height: 95,
+                  fit: BoxFit.cover,
                   errorWidget: (_, __, ___) => _placeholder())
                   : _placeholder(),
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(item['title'] ?? '',
                         style: GoogleFonts.poppins(
-                            color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14)),
                     const SizedBox(height: 3),
                     Text(item['price'] ?? '',
                         style: GoogleFonts.poppins(
-                            color: Colors.greenAccent, fontSize: 13, fontWeight: FontWeight.w600)),
+                            color: Colors.greenAccent,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600)),
                     const SizedBox(height: 5),
                     Row(
                       children: [
-                        const Icon(Icons.location_on, color: Colors.white38, size: 12),
+                        const Icon(Icons.location_on,
+                            color: Colors.white38, size: 12),
                         const SizedBox(width: 2),
                         Flexible(
                           child: Text(item['location'] ?? '',
-                              style: GoogleFonts.poppins(color: Colors.white54, fontSize: 11)),
+                              style: GoogleFonts.poppins(
+                                  color: Colors.white54, fontSize: 11)),
                         ),
                       ],
                     ),
@@ -423,18 +526,23 @@ class _ItemCard extends StatelessWidget {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: Colors.green.withValues(alpha: 0.25),
+                            color:
+                            Colors.green.withValues(alpha: 0.25),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(item['category'] ?? '',
                               style: GoogleFonts.poppins(
-                                  color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.w500)),
+                                  color: Colors.greenAccent,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500)),
                         ),
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: hasStock
                                 ? Colors.blue.withValues(alpha: 0.2)
@@ -442,15 +550,21 @@ class _ItemCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(6),
                             border: Border.all(
                               color: hasStock
-                                  ? Colors.lightBlueAccent.withValues(alpha: 0.5)
+                                  ? Colors.lightBlueAccent
+                                  .withValues(alpha: 0.5)
                                   : Colors.redAccent.withValues(alpha: 0.4),
                             ),
                           ),
                           child: Text(
-                            hasStock ? '📦 Stock: $stockVal' : '❌ Out of Stock',
+                            hasStock
+                                ? '📦 Stock: $stockVal'
+                                : '❌ Out of Stock',
                             style: GoogleFonts.poppins(
-                                color: hasStock ? Colors.lightBlueAccent : Colors.redAccent,
-                                fontSize: 10, fontWeight: FontWeight.w500),
+                                color: hasStock
+                                    ? Colors.lightBlueAccent
+                                    : Colors.redAccent,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500),
                           ),
                         ),
                       ],
@@ -468,9 +582,11 @@ class _ItemCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Colors.red.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                    border: Border.all(
+                        color: Colors.red.withValues(alpha: 0.3)),
                   ),
-                  child: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                  child: const Icon(Icons.delete_outline,
+                      color: Colors.redAccent, size: 20),
                 ),
               ),
             ),
@@ -481,20 +597,22 @@ class _ItemCard extends StatelessWidget {
   }
 
   Widget _placeholder() => Container(
-      width: 95, height: 95,
+      width: 95,
+      height: 95,
       color: Colors.grey.shade800,
       child: const Icon(Icons.image, color: Colors.white38));
 }
 
 // ─────────────────────────────────────────────
-// ITEM DETAIL SCREEN — Stock edit + Description
+// ITEM DETAIL SCREEN
 // ─────────────────────────────────────────────
 class _ShopkeeperItemDetail extends StatefulWidget {
   final Map<String, dynamic> item;
   const _ShopkeeperItemDetail({required this.item});
 
   @override
-  State<_ShopkeeperItemDetail> createState() => _ShopkeeperItemDetailState();
+  State<_ShopkeeperItemDetail> createState() =>
+      _ShopkeeperItemDetailState();
 }
 
 class _ShopkeeperItemDetailState extends State<_ShopkeeperItemDetail> {
@@ -505,7 +623,9 @@ class _ShopkeeperItemDetailState extends State<_ShopkeeperItemDetail> {
   @override
   void initState() {
     super.initState();
-    _stock = int.tryParse(widget.item['stock_quantity']?.toString() ?? '0') ?? 0;
+    _stock = int.tryParse(
+        widget.item['stock_quantity']?.toString() ?? '0') ??
+        0;
   }
 
   Future<void> _updateStock(int newStock) async {
@@ -514,8 +634,8 @@ class _ShopkeeperItemDetailState extends State<_ShopkeeperItemDetail> {
     try {
       await supabase
           .from('products')
-          .update({'stock_quantity': newStock})
-          .filter('id', 'eq', widget.item['id'].toString());
+          .update({'stock_quantity': newStock}).filter(
+          'id', 'eq', widget.item['id'].toString());
       setState(() {
         _stock = newStock;
         _updating = false;
@@ -533,8 +653,9 @@ class _ShopkeeperItemDetailState extends State<_ShopkeeperItemDetail> {
     } catch (e) {
       setState(() => _updating = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red));
       }
     }
   }
@@ -545,9 +666,11 @@ class _ShopkeeperItemDetailState extends State<_ShopkeeperItemDetail> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.grey.shade900,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20)),
         title: Text('Stock Set Karo',
-            style: GoogleFonts.poppins(color: Colors.yellow, fontWeight: FontWeight.bold)),
+            style: GoogleFonts.poppins(
+                color: Colors.yellow, fontWeight: FontWeight.bold)),
         content: TextField(
           controller: stockC,
           keyboardType: TextInputType.number,
@@ -555,7 +678,8 @@ class _ShopkeeperItemDetailState extends State<_ShopkeeperItemDetail> {
           decoration: InputDecoration(
             labelText: 'Nai quantity',
             labelStyle: const TextStyle(color: Colors.yellow),
-            prefixIcon: const Icon(Icons.inventory_2_outlined, color: Colors.yellow),
+            prefixIcon: const Icon(Icons.inventory_2_outlined,
+                color: Colors.yellow),
             enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: const BorderSide(color: Colors.white24)),
@@ -567,21 +691,26 @@ class _ShopkeeperItemDetailState extends State<_ShopkeeperItemDetail> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.white60)),
+            child: Text('Cancel',
+                style: GoogleFonts.poppins(color: Colors.white60)),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            style:
+            ElevatedButton.styleFrom(backgroundColor: Colors.green),
             onPressed: () {
               final val = int.tryParse(stockC.text.trim());
               if (val == null || val < 0) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Valid number likho!'), backgroundColor: Colors.red));
+                    const SnackBar(
+                        content: Text('Valid number likho!'),
+                        backgroundColor: Colors.red));
                 return;
               }
               Navigator.pop(ctx);
               _updateStock(val);
             },
-            child: Text('Update', style: GoogleFonts.poppins(color: Colors.white)),
+            child: Text('Update',
+                style: GoogleFonts.poppins(color: Colors.white)),
           ),
         ],
       ),
@@ -596,42 +725,55 @@ class _ShopkeeperItemDetailState extends State<_ShopkeeperItemDetail> {
     return Scaffold(
       body: Stack(
         children: [
-          SizedBox.expand(child: Image.asset('assets/images/DS.jpg', fit: BoxFit.cover)),
-          SizedBox.expand(child: Container(color: Colors.black.withValues(alpha: 0.70))),
+          SizedBox.expand(
+              child:
+              Image.asset('assets/images/DS.jpg', fit: BoxFit.cover)),
+          SizedBox.expand(
+              child: Container(
+                  color: Colors.black.withValues(alpha: 0.70))),
           SafeArea(
             child: Column(
               children: [
-                // ── AppBar ──
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 8),
                   child: Row(
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+                        icon: const Icon(Icons.arrow_back_ios_new,
+                            color: Colors.white),
                         onPressed: () => Navigator.pop(context),
                       ),
                       Expanded(
                         child: Text(p['title'] ?? '',
                             style: GoogleFonts.poppins(
-                                fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white),
                             overflow: TextOverflow.ellipsis),
                       ),
                       GestureDetector(
                         onTap: _showCustomStockDialog,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
-                            color: Colors.yellow.withValues(alpha: 0.2),
+                            color:
+                            Colors.yellow.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.yellow),
+                            border:
+                            Border.all(color: Colors.yellow),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.edit, color: Colors.yellow, size: 14),
+                              const Icon(Icons.edit,
+                                  color: Colors.yellow, size: 14),
                               const SizedBox(width: 4),
                               Text('Set Stock',
                                   style: GoogleFonts.poppins(
-                                      color: Colors.yellow, fontSize: 11, fontWeight: FontWeight.w600)),
+                                      color: Colors.yellow,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600)),
                             ],
                           ),
                         ),
@@ -639,14 +781,13 @@ class _ShopkeeperItemDetailState extends State<_ShopkeeperItemDetail> {
                     ],
                   ),
                 ),
-
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // ── Image ──
                         Stack(
                           children: [
                             ClipRRect(
@@ -654,157 +795,218 @@ class _ShopkeeperItemDetailState extends State<_ShopkeeperItemDetail> {
                               child: p['image_url'] != null
                                   ? CachedNetworkImage(
                                   imageUrl: p['image_url'],
-                                  width: double.infinity, height: 220, fit: BoxFit.cover,
-                                  placeholder: (_, __) => Container(height: 220, color: Colors.grey.shade800,
-                                      child: const Center(child: CircularProgressIndicator(color: Colors.green))),
-                                  errorWidget: (_, __, ___) => Container(height: 220, color: Colors.grey.shade800,
-                                      child: const Icon(Icons.image_not_supported, color: Colors.white54, size: 60)))
-                                  : Container(height: 220, color: Colors.grey.shade800,
-                                  child: const Icon(Icons.image, color: Colors.white54, size: 60)),
+                                  width: double.infinity,
+                                  height: 220,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, __) => Container(
+                                      height: 220,
+                                      color: Colors.grey.shade800,
+                                      child: const Center(
+                                          child:
+                                          CircularProgressIndicator(
+                                              color: Colors
+                                                  .green))),
+                                  errorWidget: (_, __, ___) =>
+                                      Container(
+                                          height: 220,
+                                          color: Colors.grey.shade800,
+                                          child: const Icon(
+                                              Icons
+                                                  .image_not_supported,
+                                              color: Colors.white54,
+                                              size: 60)))
+                                  : Container(
+                                  height: 220,
+                                  color: Colors.grey.shade800,
+                                  child: const Icon(Icons.image,
+                                      color: Colors.white54,
+                                      size: 60)),
                             ),
                             Positioned(
-                              top: 12, right: 12,
+                              top: 12,
+                              right: 12,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
                                 decoration: BoxDecoration(
                                   color: outOfStock
-                                      ? Colors.red.withValues(alpha: 0.85)
-                                      : Colors.green.withValues(alpha: 0.85),
-                                  borderRadius: BorderRadius.circular(20),
+                                      ? Colors.red
+                                      .withValues(alpha: 0.85)
+                                      : Colors.green
+                                      .withValues(alpha: 0.85),
+                                  borderRadius:
+                                  BorderRadius.circular(20),
                                 ),
                                 child: Text(
-                                  outOfStock ? 'Out of Stock' : '$_stock in stock',
+                                  outOfStock
+                                      ? 'Out of Stock'
+                                      : '$_stock in stock',
                                   style: GoogleFonts.poppins(
-                                      color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600),
                                 ),
                               ),
                             ),
                           ],
                         ),
-
                         const SizedBox(height: 16),
-
-                        // ── Title & Price ──
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          mainAxisAlignment:
+                          MainAxisAlignment.spaceBetween,
                           children: [
                             Flexible(
                               child: Text(p['title'] ?? '',
                                   style: GoogleFonts.poppins(
-                                      fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white)),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
-                                color: Colors.green.withValues(alpha: 0.25),
+                                color: Colors.green
+                                    .withValues(alpha: 0.25),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: Colors.greenAccent),
+                                border: Border.all(
+                                    color: Colors.greenAccent),
                               ),
                               child: Text(p['price'] ?? '',
                                   style: GoogleFonts.poppins(
-                                      fontSize: 16, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.greenAccent)),
                             ),
                           ],
                         ),
-
-                        const SizedBox(height: 8),
-
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                  color: Colors.green.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(20)),
-                              child: Text(p['category'] ?? '',
-                                  style: GoogleFonts.poppins(color: Colors.greenAccent, fontSize: 12)),
-                            ),
-                            const SizedBox(width: 10),
-                            const Icon(Icons.location_on, color: Colors.white54, size: 14),
-                            Flexible(
-                              child: Text(p['location'] ?? '',
-                                  style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12)),
-                            ),
-                          ],
-                        ),
-
                         const SizedBox(height: 16),
-
-                        // ── Stock Management Card ──
+                        // Stock management card
                         ClipRRect(
                           borderRadius: BorderRadius.circular(14),
                           child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                            filter:
+                            ImageFilter.blur(sigmaX: 8, sigmaY: 8),
                             child: Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: Colors.blue.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: Colors.lightBlueAccent.withValues(alpha: 0.4)),
+                                color: Colors.blue
+                                    .withValues(alpha: 0.12),
+                                borderRadius:
+                                BorderRadius.circular(14),
+                                border: Border.all(
+                                    color: Colors.lightBlueAccent
+                                        .withValues(alpha: 0.4)),
                               ),
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
                                     children: [
-                                      const Icon(Icons.inventory_2_outlined,
-                                          color: Colors.lightBlueAccent, size: 18),
+                                      const Icon(
+                                          Icons.inventory_2_outlined,
+                                          color: Colors.lightBlueAccent,
+                                          size: 18),
                                       const SizedBox(width: 8),
                                       Text('Stock Management',
                                           style: GoogleFonts.poppins(
-                                              color: Colors.lightBlueAccent,
-                                              fontSize: 14, fontWeight: FontWeight.bold)),
+                                              color: Colors
+                                                  .lightBlueAccent,
+                                              fontSize: 14,
+                                              fontWeight:
+                                              FontWeight.bold)),
                                     ],
                                   ),
                                   const SizedBox(height: 16),
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisAlignment:
+                                    MainAxisAlignment.center,
                                     children: [
-                                      // ── Minus ──
                                       GestureDetector(
-                                        onTap: _updating ? null : () => _updateStock(_stock - 1),
+                                        onTap: _updating
+                                            ? null
+                                            : () => _updateStock(
+                                            _stock - 1),
                                         child: Container(
-                                          width: 48, height: 48,
+                                          width: 48,
+                                          height: 48,
                                           decoration: BoxDecoration(
-                                            color: Colors.red.withValues(alpha: 0.2),
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
+                                            color: Colors.red
+                                                .withValues(alpha: 0.2),
+                                            borderRadius:
+                                            BorderRadius.circular(
+                                                12),
+                                            border: Border.all(
+                                                color: Colors.redAccent
+                                                    .withValues(
+                                                    alpha: 0.5)),
                                           ),
-                                          child: const Icon(Icons.remove, color: Colors.redAccent, size: 22),
+                                          child: const Icon(Icons.remove,
+                                              color: Colors.redAccent,
+                                              size: 22),
                                         ),
                                       ),
-                                      // ── Stock number ──
                                       Container(
                                         width: 100,
-                                        margin: const EdgeInsets.symmetric(horizontal: 16),
-                                        padding: const EdgeInsets.symmetric(vertical: 10),
+                                        margin:
+                                        const EdgeInsets.symmetric(
+                                            horizontal: 16),
+                                        padding:
+                                        const EdgeInsets.symmetric(
+                                            vertical: 10),
                                         decoration: BoxDecoration(
-                                          color: Colors.blue.withValues(alpha: 0.2),
-                                          borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(color: Colors.lightBlueAccent),
+                                          color: Colors.blue
+                                              .withValues(alpha: 0.2),
+                                          borderRadius:
+                                          BorderRadius.circular(12),
+                                          border: Border.all(
+                                              color: Colors
+                                                  .lightBlueAccent),
                                         ),
                                         child: _updating
                                             ? const Center(
-                                            child: SizedBox(width: 20, height: 20,
-                                                child: CircularProgressIndicator(
-                                                    color: Colors.white, strokeWidth: 2)))
+                                            child: SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child:
+                                                CircularProgressIndicator(
+                                                    color: Colors
+                                                        .white,
+                                                    strokeWidth:
+                                                    2)))
                                             : Text('$_stock',
-                                            textAlign: TextAlign.center,
-                                            style: GoogleFonts.poppins(
-                                                color: Colors.lightBlueAccent,
-                                                fontSize: 24, fontWeight: FontWeight.bold)),
+                                            textAlign:
+                                            TextAlign.center,
+                                            style:
+                                            GoogleFonts.poppins(
+                                                color: Colors
+                                                    .lightBlueAccent,
+                                                fontSize: 24,
+                                                fontWeight:
+                                                FontWeight
+                                                    .bold)),
                                       ),
-                                      // ── Plus ──
                                       GestureDetector(
-                                        onTap: _updating ? null : () => _updateStock(_stock + 1),
+                                        onTap: _updating
+                                            ? null
+                                            : () => _updateStock(
+                                            _stock + 1),
                                         child: Container(
-                                          width: 48, height: 48,
+                                          width: 48,
+                                          height: 48,
                                           decoration: BoxDecoration(
-                                            color: Colors.green.withValues(alpha: 0.2),
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.5)),
+                                            color: Colors.green
+                                                .withValues(alpha: 0.2),
+                                            borderRadius:
+                                            BorderRadius.circular(
+                                                12),
+                                            border: Border.all(
+                                                color: Colors.greenAccent
+                                                    .withValues(
+                                                    alpha: 0.5)),
                                           ),
-                                          child: const Icon(Icons.add, color: Colors.greenAccent, size: 22),
+                                          child: const Icon(Icons.add,
+                                              color: Colors.greenAccent,
+                                              size: 22),
                                         ),
                                       ),
                                     ],
@@ -812,33 +1014,23 @@ class _ShopkeeperItemDetailState extends State<_ShopkeeperItemDetail> {
                                   const SizedBox(height: 12),
                                   Center(
                                     child: Text(
-                                      _stock > 20 ? '🟢 High Stock'
-                                          : _stock > 5 ? '🟡 Limited Stock'
-                                          : _stock > 0 ? '🔴 Low Stock'
+                                      _stock > 20
+                                          ? '🟢 High Stock'
+                                          : _stock > 5
+                                          ? '🟡 Limited Stock'
+                                          : _stock > 0
+                                          ? '🔴 Low Stock'
                                           : '⛔ Out of Stock',
                                       style: GoogleFonts.poppins(
-                                          color: _stock > 20 ? Colors.greenAccent
-                                              : _stock > 5 ? Colors.yellow
-                                              : _stock > 0 ? Colors.redAccent
+                                          color: _stock > 20
+                                              ? Colors.greenAccent
+                                              : _stock > 5
+                                              ? Colors.yellow
+                                              : _stock > 0
+                                              ? Colors.redAccent
                                               : Colors.red,
-                                          fontSize: 13, fontWeight: FontWeight.w600),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: OutlinedButton.icon(
-                                      onPressed: _showCustomStockDialog,
-                                      icon: const Icon(Icons.edit, color: Colors.yellow, size: 16),
-                                      label: Text('Custom Amount Set Karo',
-                                          style: GoogleFonts.poppins(
-                                              color: Colors.yellow, fontWeight: FontWeight.w600)),
-                                      style: OutlinedButton.styleFrom(
-                                        side: const BorderSide(color: Colors.yellow),
-                                        padding: const EdgeInsets.symmetric(vertical: 10),
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12)),
-                                      ),
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600),
                                     ),
                                   ),
                                 ],
@@ -846,64 +1038,6 @@ class _ShopkeeperItemDetailState extends State<_ShopkeeperItemDetail> {
                             ),
                           ),
                         ),
-
-                        const SizedBox(height: 12),
-
-                        // ── Description ──
-                        _infoCard(
-                            icon: Icons.description_outlined,
-                            title: 'Description',
-                            value: p['description']?.toString().isNotEmpty == true
-                                ? p['description']
-                                : 'Koi description nahi hai.'),
-                        const SizedBox(height: 10),
-
-                        // ── Payment Method ──
-                        _infoCard(
-                            icon: Icons.payment,
-                            title: 'Payment Method',
-                            value: p['payment_method']?.toString().isNotEmpty == true
-                                ? p['payment_method']
-                                : 'Not specified'),
-                        const SizedBox(height: 10),
-
-                        // ── Seller Info ──
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                            child: Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: Colors.green.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: Colors.green.withValues(alpha: 0.4)),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.storefront, color: Colors.greenAccent, size: 18),
-                                      const SizedBox(width: 6),
-                                      Text('Seller Info',
-                                          style: GoogleFonts.poppins(
-                                              color: Colors.greenAccent,
-                                              fontSize: 13, fontWeight: FontWeight.bold)),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 10),
-                                  _sellerRow(Icons.person_outline, 'Name', p['seller_name'] ?? 'N/A'),
-                                  const SizedBox(height: 6),
-                                  _sellerRow(Icons.phone_outlined, 'Phone', p['seller_phone'] ?? 'N/A'),
-                                  const SizedBox(height: 6),
-                                  _sellerRow(Icons.location_on_outlined, 'Location', p['location'] ?? 'N/A'),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-
                         const SizedBox(height: 24),
                       ],
                     ),
@@ -914,58 +1048,6 @@ class _ShopkeeperItemDetailState extends State<_ShopkeeperItemDetail> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _infoCard({required IconData icon, required String title, required String value}) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white24),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, color: Colors.greenAccent, size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title,
-                        style: GoogleFonts.poppins(
-                            color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w500)),
-                    const SizedBox(height: 2),
-                    Text(value,
-                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _sellerRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, color: Colors.white60, size: 15),
-        const SizedBox(width: 6),
-        Text('$label: ', style: GoogleFonts.poppins(color: Colors.white60, fontSize: 12)),
-        Flexible(
-          child: Text(value,
-              style: GoogleFonts.poppins(
-                  color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-        ),
-      ],
     );
   }
 }
@@ -1026,28 +1108,36 @@ class _OrdersTabState extends State<_OrdersTab> {
 
   Future<void> updateOrderStatus(String id, String status) async {
     try {
-      await supabase.from('orders').update({'status': status}).eq('id', id);
+      await supabase
+          .from('orders')
+          .update({'status': status}).eq('id', id);
       fetchOrders();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(status == 'done' ? 'Order complete! ✅' : 'Order pending ho gaya!'),
-            backgroundColor: status == 'done' ? Colors.green : Colors.orange,
+            content: Text(status == 'done'
+                ? 'Order complete! ✅'
+                : 'Order pending ho gaya!'),
+            backgroundColor:
+            status == 'done' ? Colors.green : Colors.orange,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red));
       }
     }
   }
 
-  Future<void> _openWhatsApp(String phone, String buyerName, String productTitle) async {
+  Future<void> _openWhatsApp(
+      String phone, String buyerName, String productTitle) async {
     final message = Uri.encodeComponent(
         'Assalam o Alaikum $buyerName! Aapka "$productTitle" ka order receive ho gaya hai.');
-    final cleanPhone = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+    final cleanPhone =
+    phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
     final Uri uri = cleanPhone.isNotEmpty
         ? Uri.parse('https://wa.me/$cleanPhone?text=$message')
         : Uri.parse('https://wa.me/?text=$message');
@@ -1063,27 +1153,41 @@ class _OrdersTabState extends State<_OrdersTab> {
 
   @override
   Widget build(BuildContext context) {
-    final pending = orders.where((o) => o['status'] == 'pending').length;
+    final pending =
+        orders.where((o) => o['status'] == 'pending').length;
     final done = orders.where((o) => o['status'] == 'done').length;
 
     return Stack(
       children: [
-        SizedBox.expand(child: Image.asset('assets/images/DS.jpg', fit: BoxFit.cover)),
-        SizedBox.expand(child: Container(color: Colors.black.withValues(alpha: 0.70))),
+        SizedBox.expand(
+            child:
+            Image.asset('assets/images/DS.jpg', fit: BoxFit.cover)),
+        SizedBox.expand(
+            child: Container(
+                color: Colors.black.withValues(alpha: 0.70))),
         SafeArea(
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 14),
                 child: Row(
                   children: [
                     Expanded(
                       child: RichText(
                         text: TextSpan(children: [
-                          TextSpan(text: 'Farmer ',
-                              style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
-                          TextSpan(text: 'Orders',
-                              style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
+                          TextSpan(
+                              text: 'Farmer ',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white)),
+                          TextSpan(
+                              text: 'Orders',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.greenAccent)),
                         ]),
                       ),
                     ),
@@ -1092,74 +1196,113 @@ class _OrdersTabState extends State<_OrdersTab> {
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.10),
+                          color:
+                          Colors.white.withValues(alpha: 0.10),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.white24),
+                          border:
+                          Border.all(color: Colors.white24),
                         ),
-                        child: const Icon(Icons.refresh, color: Colors.white, size: 20),
+                        child: const Icon(Icons.refresh,
+                            color: Colors.white, size: 20),
                       ),
                     ),
                   ],
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
-                    _StatChip(label: 'Total', count: orders.length, color: Colors.blueAccent),
+                    _StatChip(
+                        label: 'Total',
+                        count: orders.length,
+                        color: Colors.blueAccent),
                     const SizedBox(width: 10),
-                    _StatChip(label: 'Pending', count: pending, color: Colors.orange),
+                    _StatChip(
+                        label: 'Pending',
+                        count: pending,
+                        color: Colors.orange),
                     const SizedBox(width: 10),
-                    _StatChip(label: 'Done', count: done, color: Colors.greenAccent),
+                    _StatChip(
+                        label: 'Done',
+                        count: done,
+                        color: Colors.greenAccent),
                   ],
                 ),
               ),
               const SizedBox(height: 12),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
-                    _FilterChip(label: 'All', active: _filter == 'all',
-                        onTap: () => setState(() => _filter = 'all')),
+                    _FilterChip(
+                        label: 'All',
+                        active: _filter == 'all',
+                        onTap: () =>
+                            setState(() => _filter = 'all')),
                     const SizedBox(width: 8),
-                    _FilterChip(label: 'Pending', active: _filter == 'pending',
-                        onTap: () => setState(() => _filter = 'pending'), color: Colors.orange),
+                    _FilterChip(
+                        label: 'Pending',
+                        active: _filter == 'pending',
+                        onTap: () =>
+                            setState(() => _filter = 'pending'),
+                        color: Colors.orange),
                     const SizedBox(width: 8),
-                    _FilterChip(label: 'Done', active: _filter == 'done',
-                        onTap: () => setState(() => _filter = 'done'), color: Colors.greenAccent),
+                    _FilterChip(
+                        label: 'Done',
+                        active: _filter == 'done',
+                        onTap: () =>
+                            setState(() => _filter = 'done'),
+                        color: Colors.greenAccent),
                   ],
                 ),
               ),
               const SizedBox(height: 12),
               Expanded(
                 child: isLoading
-                    ? const Center(child: CircularProgressIndicator(color: Colors.green))
+                    ? const Center(
+                    child: CircularProgressIndicator(
+                        color: Colors.green))
                     : filteredOrders.isEmpty
                     ? Center(
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisAlignment:
+                    MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.receipt_long_outlined, color: Colors.white24, size: 80),
+                      const Icon(
+                          Icons.receipt_long_outlined,
+                          color: Colors.white24,
+                          size: 80),
                       const SizedBox(height: 16),
-                      Text(_filter == 'all' ? 'Koi order nahi abhi' : 'Is category mein koi order nahi',
-                          style: GoogleFonts.poppins(color: Colors.white60, fontSize: 15)),
-                      const SizedBox(height: 8),
-                      Text('Logged in as: "${widget.shopkeeperName}"',
-                          style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
+                      Text(
+                          _filter == 'all'
+                              ? 'Koi order nahi abhi'
+                              : 'Is category mein koi order nahi',
+                          style: GoogleFonts.poppins(
+                              color: Colors.white60,
+                              fontSize: 15)),
                     ],
                   ),
                 )
                     : RefreshIndicator(
                   onRefresh: fetchOrders,
                   child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16),
                     itemCount: filteredOrders.length,
                     itemBuilder: (context, index) {
-                      final order = filteredOrders[index];
+                      final order =
+                      filteredOrders[index];
                       return _OrderCard(
                         order: order,
-                        onMarkDone: () => updateOrderStatus(order['id'], 'done'),
-                        onMarkPending: () => updateOrderStatus(order['id'], 'pending'),
+                        onMarkDone: () =>
+                            updateOrderStatus(
+                                order['id'], 'done'),
+                        onMarkPending: () =>
+                            updateOrderStatus(
+                                order['id'], 'pending'),
                         onWhatsApp: () => _openWhatsApp(
                           order['buyer_phone'] ?? '',
                           order['buyer_name'] ?? '',
@@ -1182,7 +1325,10 @@ class _StatChip extends StatelessWidget {
   final String label;
   final int count;
   final Color color;
-  const _StatChip({required this.label, required this.count, required this.color});
+  const _StatChip(
+      {required this.label,
+        required this.count,
+        required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -1196,8 +1342,14 @@ class _StatChip extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Text('$count', style: GoogleFonts.poppins(color: color, fontWeight: FontWeight.bold, fontSize: 18)),
-            Text(label, style: GoogleFonts.poppins(color: Colors.white60, fontSize: 11)),
+            Text('$count',
+                style: GoogleFonts.poppins(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18)),
+            Text(label,
+                style: GoogleFonts.poppins(
+                    color: Colors.white60, fontSize: 11)),
           ],
         ),
       ),
@@ -1210,24 +1362,34 @@ class _FilterChip extends StatelessWidget {
   final bool active;
   final VoidCallback onTap;
   final Color color;
-  const _FilterChip({required this.label, required this.active, required this.onTap, this.color = Colors.greenAccent});
+  const _FilterChip(
+      {required this.label,
+        required this.active,
+        required this.onTap,
+        this.color = Colors.greenAccent});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        padding:
+        const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: active ? color.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.08),
+          color: active
+              ? color.withValues(alpha: 0.2)
+              : Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: active ? color : Colors.white24),
+          border:
+          Border.all(color: active ? color : Colors.white24),
         ),
         child: Text(label,
             style: GoogleFonts.poppins(
                 color: active ? color : Colors.white60,
                 fontSize: 12,
-                fontWeight: active ? FontWeight.w600 : FontWeight.normal)),
+                fontWeight: active
+                    ? FontWeight.w600
+                    : FontWeight.normal)),
       ),
     );
   }
@@ -1248,7 +1410,8 @@ class _OrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPending = order['status'] == 'pending';
-    final statusColor = isPending ? Colors.orange : Colors.greenAccent;
+    final statusColor =
+    isPending ? Colors.orange : Colors.greenAccent;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -1261,11 +1424,13 @@ class _OrderCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.05),
               borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(18), topRight: Radius.circular(18)),
+                  topLeft: Radius.circular(18),
+                  topRight: Radius.circular(18)),
             ),
             child: Row(
               children: [
@@ -1274,37 +1439,54 @@ class _OrderCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(order['product_title'] ?? '',
-                          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                          style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15)),
                       const SizedBox(height: 2),
                       Text(order['product_price'] ?? '',
-                          style: GoogleFonts.poppins(color: Colors.greenAccent, fontSize: 13, fontWeight: FontWeight.w600)),
+                          style: GoogleFonts.poppins(
+                              color: Colors.greenAccent,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: statusColor.withValues(alpha: 0.5)),
+                    border: Border.all(
+                        color: statusColor.withValues(alpha: 0.5)),
                   ),
-                  child: Text(isPending ? '⏳ Pending' : '✅ Done',
-                      style: GoogleFonts.poppins(color: statusColor, fontSize: 11, fontWeight: FontWeight.w600)),
+                  child: Text(
+                      isPending ? '⏳ Pending' : '✅ Done',
+                      style: GoogleFonts.poppins(
+                          color: statusColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600)),
                 ),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 14, vertical: 10),
             child: Column(
               children: [
-                _orderRow(Icons.person_outline, 'Buyer', order['buyer_name'] ?? 'N/A'),
+                _orderRow(Icons.person_outline, 'Buyer',
+                    order['buyer_name'] ?? 'N/A'),
                 const SizedBox(height: 6),
-                _orderRow(Icons.phone_outlined, 'Phone', order['buyer_phone'] ?? 'N/A'),
+                _orderRow(Icons.phone_outlined, 'Phone',
+                    order['buyer_phone'] ?? 'N/A'),
                 const SizedBox(height: 6),
-                _orderRow(Icons.location_on_outlined, 'Address', order['buyer_address'] ?? 'N/A'),
+                _orderRow(Icons.location_on_outlined, 'Address',
+                    order['buyer_address'] ?? 'N/A'),
                 const SizedBox(height: 6),
-                _orderRow(Icons.production_quantity_limits, 'Quantity', '${order['quantity'] ?? 1}'),
+                _orderRow(Icons.production_quantity_limits,
+                    'Quantity', '${order['quantity'] ?? 1}'),
               ],
             ),
           ),
@@ -1316,20 +1498,27 @@ class _OrderCard extends StatelessWidget {
                   child: GestureDetector(
                     onTap: onWhatsApp,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      padding:
+                      const EdgeInsets.symmetric(vertical: 10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF25D366).withValues(alpha: 0.15),
+                        color: const Color(0xFF25D366)
+                            .withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF25D366).withValues(alpha: 0.5)),
+                        border: Border.all(
+                            color: const Color(0xFF25D366)
+                                .withValues(alpha: 0.5)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.chat, color: Color(0xFF25D366), size: 16),
+                          const Icon(Icons.chat,
+                              color: Color(0xFF25D366), size: 16),
                           const SizedBox(width: 6),
                           Text('WhatsApp',
                               style: GoogleFonts.poppins(
-                                  color: const Color(0xFF25D366), fontSize: 12, fontWeight: FontWeight.w600)),
+                                  color: const Color(0xFF25D366),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600)),
                         ],
                       ),
                     ),
@@ -1340,27 +1529,40 @@ class _OrderCard extends StatelessWidget {
                   child: GestureDetector(
                     onTap: isPending ? onMarkDone : onMarkPending,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      padding:
+                      const EdgeInsets.symmetric(vertical: 10),
                       decoration: BoxDecoration(
                         color: isPending
                             ? Colors.green.withValues(alpha: 0.15)
-                            : Colors.orange.withValues(alpha: 0.15),
+                            : Colors.orange
+                            .withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                             color: isPending
-                                ? Colors.greenAccent.withValues(alpha: 0.5)
-                                : Colors.orange.withValues(alpha: 0.5)),
+                                ? Colors.greenAccent
+                                .withValues(alpha: 0.5)
+                                : Colors.orange
+                                .withValues(alpha: 0.5)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(isPending ? Icons.check_circle_outline : Icons.undo,
-                              color: isPending ? Colors.greenAccent : Colors.orange, size: 16),
+                          Icon(
+                              isPending
+                                  ? Icons.check_circle_outline
+                                  : Icons.undo,
+                              color: isPending
+                                  ? Colors.greenAccent
+                                  : Colors.orange,
+                              size: 16),
                           const SizedBox(width: 6),
                           Text(isPending ? 'Mark Done' : 'Undo',
                               style: GoogleFonts.poppins(
-                                  color: isPending ? Colors.greenAccent : Colors.orange,
-                                  fontSize: 12, fontWeight: FontWeight.w600)),
+                                  color: isPending
+                                      ? Colors.greenAccent
+                                      : Colors.orange,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600)),
                         ],
                       ),
                     ),
@@ -1380,10 +1582,15 @@ class _OrderCard extends StatelessWidget {
       children: [
         Icon(icon, color: Colors.white38, size: 15),
         const SizedBox(width: 8),
-        Text('$label: ', style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12)),
+        Text('$label: ',
+            style:
+            GoogleFonts.poppins(color: Colors.white54, fontSize: 12)),
         Flexible(
           child: Text(value,
-              style: GoogleFonts.poppins(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
+              style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500)),
         ),
       ],
     );
@@ -1391,57 +1598,259 @@ class _OrderCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-// TAB 3 — PROFILE
+// TAB 3 — PROFILE  (now fully editable)
 // ─────────────────────────────────────────────
 class _ProfileTab extends StatelessWidget {
   final String shopkeeperName;
+  final String shopPhone;
+  final String shopLocation;
+  final String shopDesc;
   final VoidCallback onLogout;
-  const _ProfileTab({required this.shopkeeperName, required this.onLogout});
+  final void Function({
+  required String name,
+  required String phone,
+  required String location,
+  required String desc,
+  }) onProfileUpdated;
+
+  const _ProfileTab({
+    required this.shopkeeperName,
+    required this.shopPhone,
+    required this.shopLocation,
+    required this.shopDesc,
+    required this.onLogout,
+    required this.onProfileUpdated,
+  });
+
+  void _showEditDialog(BuildContext context) {
+    final nameC     = TextEditingController(text: shopkeeperName);
+    final phoneC    = TextEditingController(text: shopPhone);
+    final locationC = TextEditingController(text: shopLocation);
+    final descC     = TextEditingController(text: shopDesc);
+    bool saving = false;
+
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          backgroundColor: Colors.grey.shade900,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20)),
+          title: Text('Edit Profile',
+              style: GoogleFonts.poppins(
+                  color: Colors.greenAccent,
+                  fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _field('Shop / Name', nameC, Icons.store_outlined),
+                const SizedBox(height: 10),
+                _field('Phone (WhatsApp)', phoneC, Icons.phone_outlined,
+                    keyType: TextInputType.phone),
+                const SizedBox(height: 10),
+                _field('Location', locationC,
+                    Icons.location_on_outlined),
+                const SizedBox(height: 10),
+                _field('About / Description', descC,
+                    Icons.description_outlined,
+                    maxLines: 3),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel',
+                  style: GoogleFonts.poppins(color: Colors.white60)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green),
+              onPressed: saving
+                  ? null
+                  : () async {
+                if (nameC.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content:
+                        Text('Name khali nahi ho sakta!'),
+                        backgroundColor: Colors.red),
+                  );
+                  return;
+                }
+                setS(() => saving = true);
+                await Future.delayed(
+                    const Duration(milliseconds: 300));
+                onProfileUpdated(
+                  name: nameC.text.trim(),
+                  phone: phoneC.text.trim(),
+                  location: locationC.text.trim(),
+                  desc: descC.text.trim(),
+                );
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Profile Updated! ✅'),
+                        backgroundColor: Colors.green),
+                  );
+                }
+                setS(() => saving = false);
+              },
+              child: saving
+                  ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      color: Colors.white, strokeWidth: 2))
+                  : Text('Save',
+                  style:
+                  GoogleFonts.poppins(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _field(String label, TextEditingController c, IconData icon,
+      {TextInputType keyType = TextInputType.text, int maxLines = 1}) {
+    return TextField(
+      controller: c,
+      keyboardType: keyType,
+      maxLines: maxLines,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: GoogleFonts.poppins(
+            color: Colors.greenAccent, fontSize: 12),
+        prefixIcon:
+        Icon(icon, color: Colors.greenAccent, size: 18),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.white24)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide:
+            const BorderSide(color: Colors.greenAccent)),
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.05),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        SizedBox.expand(child: Image.asset('assets/images/DS.jpg', fit: BoxFit.cover)),
-        SizedBox.expand(child: Container(color: Colors.black.withValues(alpha: 0.70))),
+        SizedBox.expand(
+            child:
+            Image.asset('assets/images/DS.jpg', fit: BoxFit.cover)),
+        SizedBox.expand(
+            child: Container(
+                color: Colors.black.withValues(alpha: 0.70))),
         SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(
               children: [
                 const SizedBox(height: 20),
+
+                // ── Avatar ──
                 Container(
-                  width: 90, height: 90,
+                  width: 90,
+                  height: 90,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.green.withValues(alpha: 0.2),
-                    border: Border.all(color: Colors.greenAccent, width: 2),
+                    border: Border.all(
+                        color: Colors.greenAccent, width: 2),
                   ),
-                  child: const Icon(Icons.storefront, color: Colors.greenAccent, size: 44),
+                  child: const Icon(Icons.storefront,
+                      color: Colors.greenAccent, size: 44),
                 ),
                 const SizedBox(height: 16),
+
                 Text(shopkeeperName,
-                    style: GoogleFonts.poppins(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                    style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
                 Text('Shopkeeper',
-                    style: GoogleFonts.poppins(color: Colors.white60, fontSize: 14)),
+                    style: GoogleFonts.poppins(
+                        color: Colors.white60, fontSize: 14)),
+                const SizedBox(height: 28),
+
+                // ── Info Tiles ──
+                _InfoTile(
+                    icon: Icons.store,
+                    label: 'Name',
+                    value: shopkeeperName),
+                const SizedBox(height: 12),
+                _InfoTile(
+                    icon: Icons.phone_outlined,
+                    label: 'Phone',
+                    value: shopPhone.isEmpty ? 'Not set' : shopPhone),
+                const SizedBox(height: 12),
+                _InfoTile(
+                    icon: Icons.location_on_outlined,
+                    label: 'Location',
+                    value: shopLocation.isEmpty
+                        ? 'Not set'
+                        : shopLocation),
+                const SizedBox(height: 12),
+                _InfoTile(
+                    icon: Icons.description_outlined,
+                    label: 'About',
+                    value: shopDesc.isEmpty
+                        ? 'Farming Equipment Seller'
+                        : shopDesc),
+
                 const SizedBox(height: 32),
-                _InfoTile(icon: Icons.store, label: 'Role', value: 'Farming Equipment Seller'),
-                const SizedBox(height: 12),
-                _InfoTile(icon: Icons.people_alt_outlined, label: 'Customers', value: 'Farmers'),
-                const SizedBox(height: 12),
-                _InfoTile(icon: Icons.category_outlined, label: 'Products', value: 'Tractor, Fertilizer, Seeds etc.'),
-                const SizedBox(height: 40),
+
+                // ── Edit Profile Button ──
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showEditDialog(context),
+                    icon: const Icon(Icons.edit_outlined,
+                        color: Colors.greenAccent),
+                    label: Text('Edit Profile',
+                        style: GoogleFonts.poppins(
+                            color: Colors.greenAccent,
+                            fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(
+                          color: Colors.greenAccent),
+                      padding:
+                      const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // ── Logout ──
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: onLogout,
-                    icon: const Icon(Icons.logout, color: Colors.white),
+                    icon:
+                    const Icon(Icons.logout, color: Colors.white),
                     label: Text('Logout',
-                        style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+                        style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red.shade700,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      padding:
+                      const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
                     ),
                   ),
                 ),
@@ -1458,7 +1867,10 @@ class _InfoTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  const _InfoTile({required this.icon, required this.label, required this.value});
+  const _InfoTile(
+      {required this.icon,
+        required this.label,
+        required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -1477,16 +1889,24 @@ class _InfoTile extends StatelessWidget {
               color: Colors.green.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: Colors.greenAccent, size: 20),
+            child:
+            Icon(icon, color: Colors.greenAccent, size: 20),
           ),
           const SizedBox(width: 14),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: GoogleFonts.poppins(color: Colors.white54, fontSize: 11)),
-              Text(value,
-                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: GoogleFonts.poppins(
+                        color: Colors.white54, fontSize: 11)),
+                Text(value,
+                    style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13)),
+              ],
+            ),
           ),
         ],
       ),

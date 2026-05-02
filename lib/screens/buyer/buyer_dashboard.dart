@@ -23,9 +23,15 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
   bool isLoading = true;
   int _currentIndex = 0;
 
+  // Profile editable fields
+  late String _displayName;
+  String _phone = '';
+  String _location = '';
+
   @override
   void initState() {
     super.initState();
+    _displayName = widget.buyerName;
     fetchFarmerProducts();
     searchController.addListener(_onSearch);
   }
@@ -58,7 +64,6 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
     }
   }
 
-  // ✅ FIX: Null-safe search
   void _onSearch() {
     final query = searchController.text.toLowerCase();
     setState(() {
@@ -76,7 +81,13 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _buildBuyScreen(),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          _buildBuyScreen(),
+          _buildProfileScreen(),
+        ],
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.grey.shade900,
@@ -85,7 +96,7 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
           onTap: (i) {
-            if (i == 1) {
+            if (i == 2) {
               _logout();
             } else {
               setState(() => _currentIndex = i);
@@ -106,6 +117,11 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
               label: 'Buy Crops',
             ),
             BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'Profile',
+            ),
+            BottomNavigationBarItem(
               icon: Icon(Icons.logout),
               label: 'Logout',
             ),
@@ -115,6 +131,7 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
     );
   }
 
+  // ── BUY SCREEN ─────────────────────────────────────────────────────────────
   Widget _buildBuyScreen() {
     return Stack(
       children: [
@@ -272,8 +289,323 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
       ],
     );
   }
+
+  // ── PROFILE SCREEN ─────────────────────────────────────────────────────────
+  Widget _buildProfileScreen() {
+    return Stack(
+      children: [
+        SizedBox.expand(
+            child: Image.asset('assets/images/DB.jpg', fit: BoxFit.cover)),
+        SizedBox.expand(
+            child: Container(color: Colors.black.withValues(alpha: 0.65))),
+        SafeArea(
+          child: SingleChildScrollView(
+            padding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              children: [
+                // ── Header ──
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 10),
+                      color: Colors.black.withValues(alpha: 0.3),
+                      child: RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                                text: 'My ',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white)),
+                            TextSpan(
+                                text: 'Profile',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 28),
+
+                // ── Avatar ──
+                Container(
+                  width: 90,
+                  height: 90,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.green, width: 3),
+                    color: Colors.white.withValues(alpha: 0.1),
+                  ),
+                  child: const Icon(Icons.person,
+                      color: Colors.green, size: 48),
+                ),
+
+                const SizedBox(height: 14),
+
+                Text(_displayName,
+                    style: GoogleFonts.poppins(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white)),
+
+                const SizedBox(height: 6),
+
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: Colors.greenAccent.withValues(alpha: 0.5)),
+                  ),
+                  child: Text('🛒 Buyer',
+                      style: GoogleFonts.poppins(
+                          color: Colors.greenAccent,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600)),
+                ),
+
+                const SizedBox(height: 28),
+
+                // ── Info Cards ──
+                _profileInfoCard(
+                    icon: Icons.person_outline,
+                    label: 'Name',
+                    value: _displayName),
+                const SizedBox(height: 12),
+                _profileInfoCard(
+                    icon: Icons.phone_outlined,
+                    label: 'Phone',
+                    value: _phone.isEmpty ? 'Not set' : _phone),
+                const SizedBox(height: 12),
+                _profileInfoCard(
+                    icon: Icons.location_on_outlined,
+                    label: 'Location',
+                    value: _location.isEmpty ? 'Not set' : _location),
+                const SizedBox(height: 12),
+                _profileInfoCard(
+                    icon: Icons.shopping_basket_outlined,
+                    label: 'Role',
+                    value: 'Buyer — Crop Purchaser'),
+
+                const SizedBox(height: 28),
+
+                // ── Edit Button ──
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _showEditProfileDialog,
+                    icon:
+                    const Icon(Icons.edit_outlined, color: Colors.yellow),
+                    label: Text('Edit Profile',
+                        style: GoogleFonts.poppins(
+                            color: Colors.yellow,
+                            fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.yellow),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // ── Logout Button ──
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _logout,
+                    icon: const Icon(Icons.logout, color: Colors.white),
+                    label: Text('Logout',
+                        style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.shade700,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _profileInfoCard(
+      {required IconData icon,
+        required String label,
+        required String value}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Container(
+          padding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white24),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: Colors.greenAccent, size: 22),
+              const SizedBox(width: 14),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: GoogleFonts.poppins(
+                          color: Colors.white54, fontSize: 11)),
+                  Text(value,
+                      style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showEditProfileDialog() {
+    final nameC     = TextEditingController(text: _displayName);
+    final phoneC    = TextEditingController(text: _phone);
+    final locationC = TextEditingController(text: _location);
+    bool saving = false;
+
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          backgroundColor: Colors.grey.shade900,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20)),
+          title: Text('Edit Profile',
+              style: GoogleFonts.poppins(
+                  color: Colors.yellow,
+                  fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _dialogField('Name', nameC, Icons.person_outline,
+                    accentColor: Colors.yellow),
+                const SizedBox(height: 10),
+                _dialogField('Phone', phoneC, Icons.phone_outlined,
+                    accentColor: Colors.yellow,
+                    keyboardType: TextInputType.phone),
+                const SizedBox(height: 10),
+                _dialogField('Location', locationC, Icons.location_on_outlined,
+                    accentColor: Colors.yellow),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel',
+                  style: GoogleFonts.poppins(color: Colors.white60)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green),
+              onPressed: saving
+                  ? null
+                  : () async {
+                if (nameC.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Name khali nahi ho sakta!'),
+                        backgroundColor: Colors.red),
+                  );
+                  return;
+                }
+                setS(() => saving = true);
+                // Small delay to show loading
+                await Future.delayed(
+                    const Duration(milliseconds: 300));
+                if (mounted) {
+                  setState(() {
+                    _displayName = nameC.text.trim();
+                    _phone       = phoneC.text.trim();
+                    _location    = locationC.text.trim();
+                  });
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Profile Updated! ✅'),
+                        backgroundColor: Colors.green),
+                  );
+                }
+                setS(() => saving = false);
+              },
+              child: saving
+                  ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      color: Colors.white, strokeWidth: 2))
+                  : Text('Save',
+                  style: GoogleFonts.poppins(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _dialogField(
+      String label,
+      TextEditingController c,
+      IconData icon, {
+        Color accentColor = Colors.greenAccent,
+        TextInputType keyboardType = TextInputType.text,
+      }) {
+    return TextField(
+      controller: c,
+      keyboardType: keyboardType,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle:
+        GoogleFonts.poppins(color: accentColor, fontSize: 12),
+        prefixIcon: Icon(icon, color: accentColor, size: 18),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.white24)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: accentColor)),
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.05),
+      ),
+    );
+  }
 }
 
+// ── PRODUCT CARD ──────────────────────────────────────────────────────────────
 class _ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
   const _ProductCard({required this.product});
