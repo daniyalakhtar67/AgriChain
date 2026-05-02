@@ -1,4 +1,6 @@
 import 'dart:ui';
+import 'package:argichain/screens/buyer/cart_screen.dart';
+import 'package:argichain/screens/buyer/product_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -20,12 +22,11 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
   List<Map<String, dynamic>> filteredProducts = [];
   bool isLoading = true;
   int _currentIndex = 0;
-  String _filter = 'all'; // all, farmer, shopkeeper
 
   @override
   void initState() {
     super.initState();
-    fetchProducts();
+    fetchFarmerProducts();
     searchController.addListener(_onSearch);
   }
 
@@ -35,13 +36,13 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
     super.dispose();
   }
 
-  Future<void> fetchProducts() async {
+  Future<void> fetchFarmerProducts() async {
     try {
-      var query = supabase.from('products').select();
-      if (_filter != 'all') {
-        query = query.eq('seller_type', _filter) as dynamic;
-      }
-      final data = await query.order('created_at', ascending: false);
+      final data = await supabase
+          .from('products')
+          .select()
+          .eq('seller_type', 'farmer')
+          .order('created_at', ascending: false);
       setState(() {
         allProducts = List<Map<String, dynamic>>.from(data);
         filteredProducts = allProducts;
@@ -49,6 +50,11 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
       });
     } catch (e) {
       setState(() => isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -69,33 +75,41 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _currentIndex == 0 ? _buildBuyScreen() : _buildInfo(),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex > 1 ? 0 : _currentIndex,
-        onTap: (i) {
-          if (i == 2) {
-            _logout();
-          } else {
-            setState(() => _currentIndex = i);
-          }
-        },
-        selectedItemColor: Colors.green,
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_cart_outlined),
-            label: 'Buy Crops',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.info_outline),
-            label: 'Info.',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.logout),
-            label: 'Logout',
-          ),
-        ],
+      body: _buildBuyScreen(),
+      // ✅ FIX: Black navbar with white icons — same as shopkeeper
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey.shade900,
+          border: const Border(top: BorderSide(color: Colors.white12)),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (i) {
+            if (i == 1) {
+              _logout();
+            } else {
+              setState(() => _currentIndex = i);
+            }
+          },
+          selectedItemColor: Colors.green,
+          unselectedItemColor: Colors.white,    // ✅ white icons
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.transparent,  // ✅ transparent so Container shows
+          elevation: 0,
+          selectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 11),
+          unselectedLabelStyle: GoogleFonts.poppins(fontSize: 11),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.shopping_basket_outlined),
+              activeIcon: Icon(Icons.shopping_basket),
+              label: 'Buy Crops',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.logout),
+              label: 'Logout',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -112,7 +126,6 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
         SafeArea(
           child: Column(
             children: [
-              // ── HEADER ──
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 child: Stack(
@@ -129,22 +142,8 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
                             child: RichText(
                               text: TextSpan(
                                 children: [
-                                  TextSpan(
-                                    text: 'Buy',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 26,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green,
-                                    ),
-                                  ),
-                                  TextSpan(
-                                    text: 'er',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 26,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.yellow,
-                                    ),
-                                  ),
+                                  TextSpan(text: 'Buy', style: GoogleFonts.poppins(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white)),
+                                  TextSpan(text: 'er', style: GoogleFonts.poppins(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.green)),
                                 ],
                               ),
                             ),
@@ -152,11 +151,26 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
                         ),
                       ),
                     ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: GestureDetector(
+                        onTap: () => Navigator.push(context,
+                            MaterialPageRoute(builder: (_) => const BuyerCartScreen())),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.white24),
+                          ),
+                          child: const Icon(Icons.shopping_cart_outlined, color: Colors.white, size: 24),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
 
-              // ── SEARCH BAR ──
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Container(
@@ -169,7 +183,7 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
                     controller: searchController,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
-                      hintText: 'Search crops, equipment...',
+                      hintText: 'Search crops...',
                       hintStyle: GoogleFonts.poppins(color: Colors.white60),
                       prefixIcon: const Icon(Icons.search, color: Colors.white60),
                       border: InputBorder.none,
@@ -179,66 +193,34 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
                 ),
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
 
-              // ── FILTER CHIPS ──
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    _filterChip('All', 'all'),
-                    const SizedBox(width: 8),
-                    _filterChip('Farmers', 'farmer'),
-                    const SizedBox(width: 8),
-                    _filterChip('Shops', 'shopkeeper'),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // ── TRENDING HEADER ──
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
+                  color: Colors.grey.withValues(alpha: 0.35),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white24),
+                  border: Border.all(color: Colors.grey.shade600),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Trending',
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        )),
-                    Text(
-                      'See all (${filteredProducts.length})',
-                      style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        color: Colors.greenAccent,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    Text('Trending Crops', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                    Text('See all (${filteredProducts.length})', style: GoogleFonts.poppins(fontSize: 13, color: Colors.greenAccent, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
 
               const SizedBox(height: 10),
 
-              // ── PRODUCT LIST ──
               Expanded(
                 child: isLoading
                     ? const Center(child: CircularProgressIndicator(color: Colors.green))
                     : filteredProducts.isEmpty
-                    ? Center(
-                    child: Text('No products found',
-                        style: GoogleFonts.poppins(color: Colors.white)))
+                    ? Center(child: Text('No crops found', style: GoogleFonts.poppins(color: Colors.white)))
                     : RefreshIndicator(
-                  onRefresh: fetchProducts,
+                  onRefresh: fetchFarmerProducts,
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: filteredProducts.length,
@@ -254,54 +236,6 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
       ],
     );
   }
-
-  Widget _filterChip(String label, String value) {
-    final selected = _filter == value;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _filter = value;
-          isLoading = true;
-        });
-        fetchProducts();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? Colors.green : Colors.white.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? Colors.green : Colors.white24),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.poppins(
-            color: Colors.white,
-            fontSize: 13,
-            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfo() {
-    return Stack(
-      children: [
-        SizedBox.expand(
-          child: Image.asset('assets/images/Buyer_bg.jpg', fit: BoxFit.cover),
-        ),
-        SizedBox.expand(
-          child: Container(color: Colors.black.withValues(alpha: 0.65)),
-        ),
-        SafeArea(
-          child: Center(
-            child: Text('Info Coming Soon',
-                style: GoogleFonts.poppins(color: Colors.white, fontSize: 20)),
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 class _ProductCard extends StatelessWidget {
@@ -310,125 +244,82 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white24),
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => BuyerProductDetail(product: product)),
       ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(16),
-              bottomLeft: Radius.circular(16),
-            ),
-            child: product['image_url'] != null
-                ? CachedNetworkImage(
-              imageUrl: product['image_url'],
-              width: 110,
-              height: 100,
-              fit: BoxFit.cover,
-              placeholder: (context, url) => Container(
-                width: 110,
-                height: 100,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
+              ),
+              child: product['image_url'] != null
+                  ? CachedNetworkImage(
+                imageUrl: product['image_url'],
+                width: 110, height: 100, fit: BoxFit.cover,
+                placeholder: (_, __) => Container(
+                    width: 110, height: 100,
+                    color: Colors.grey.shade800,
+                    child: const Center(child: CircularProgressIndicator(color: Colors.green, strokeWidth: 2))),
+                errorWidget: (_, __, ___) => Container(
+                    width: 110, height: 100,
+                    color: Colors.grey.shade800,
+                    child: const Icon(Icons.image_not_supported, color: Colors.white54)),
+              )
+                  : Container(
+                width: 110, height: 100,
                 color: Colors.grey.shade800,
-                child: const Center(
-                  child: CircularProgressIndicator(
-                      color: Colors.green, strokeWidth: 2),
+                child: const Icon(Icons.image, color: Colors.white54),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(product['title'] ?? '',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
+                        ),
+                        Text(product['price'] ?? '',
+                            style: GoogleFonts.poppins(
+                                fontSize: 13, fontWeight: FontWeight.w600, color: Colors.greenAccent)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(product['location'] ?? '',
+                        style: GoogleFonts.poppins(fontSize: 11, color: Colors.white60)),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(8)),
+                      child: Text(product['category'] ?? '',
+                          style: GoogleFonts.poppins(
+                              fontSize: 11, color: Colors.greenAccent, fontWeight: FontWeight.w500)),
+                    ),
+                  ],
                 ),
               ),
-              errorWidget: (context, url, error) => Container(
-                width: 110,
-                height: 100,
-                color: Colors.grey.shade800,
-                child: const Icon(Icons.image_not_supported,
-                    color: Colors.white54),
-              ),
-            )
-                : Container(
-              width: 110,
-              height: 100,
-              color: Colors.grey.shade800,
-              child: const Icon(Icons.image, color: Colors.white54),
             ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          product['title'] ?? '',
-                          style: GoogleFonts.poppins(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        product['price'] ?? '',
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.greenAccent,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    product['location'] ?? '',
-                    style: GoogleFonts.poppins(fontSize: 11, color: Colors.white60),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          product['category'] ?? '',
-                          style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            color: Colors.greenAccent,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          product['seller_type'] == 'farmer' ? '🌾 Farmer' : '🏪 Shop',
-                          style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            color: Colors.lightBlueAccent,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
