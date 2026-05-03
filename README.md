@@ -1,4 +1,4 @@
-# argichain
+# agrichain
 
 A new Flutter project.
 
