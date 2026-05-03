@@ -1,5 +1,7 @@
 import 'dart:ui';
 import 'package:argichain/screens/buyer/cart_screen.dart';
+import 'package:argichain/screens/farmer/payment.dart';
+import 'package:argichain/utils/payment_methods.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -26,9 +28,11 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
   final _phoneC   = TextEditingController();
   final _addressC = TextEditingController();
   final _qtyC     = TextEditingController(text: '1');
+  final _accC     = TextEditingController();
   bool _placing   = false;
 
-  // ── KG stock from farmer ──
+  String? _selectedPaymentId;
+
   double _availableKg = 0;
   double _selectedKg  = 1;
 
@@ -40,7 +44,6 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
     _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeIn);
     _fadeCtrl.forward();
 
-    // Parse KG quantity
     final kgRaw = widget.product['crop_quantity_kg'];
     _availableKg = (kgRaw != null && double.tryParse(kgRaw.toString()) != null)
         ? double.parse(kgRaw.toString())
@@ -55,6 +58,7 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
     _phoneC.dispose();
     _addressC.dispose();
     _qtyC.dispose();
+    _accC.dispose();
     super.dispose();
   }
 
@@ -69,13 +73,13 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
     }
     try {
       await supabase.from('cart').insert({
-        'product_id'    : widget.product['id'],
-        'product_title' : widget.product['title'],
-        'product_price' : widget.product['price'],
-        'product_image' : widget.product['image_url'],
-        'seller_name'   : widget.product['seller_name'],
-        'seller_type'   : widget.product['seller_type'],
-        'quantity'      : _selectedKg.toInt() > 0 ? _selectedKg.toInt() : 1,
+        'product_id'   : widget.product['id'],
+        'product_title': widget.product['title'],
+        'product_price': widget.product['price'],
+        'product_image': widget.product['image_url'],
+        'seller_name'  : widget.product['seller_name'],
+        'seller_type'  : 'farmer',
+        'quantity'     : _selectedKg.toInt() > 0 ? _selectedKg.toInt() : 1,
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -91,11 +95,13 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                   onTap: () {
                     ScaffoldMessenger.of(context).hideCurrentSnackBar();
                     Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => const BuyerCartScreen()));
+                        MaterialPageRoute(
+                            builder: (_) => const BuyerCartScreen()));
                   },
                   child: Text('View Cart',
                       style: GoogleFonts.poppins(
-                          color: Colors.yellow, fontWeight: FontWeight.bold)),
+                          color: Colors.yellow,
+                          fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -112,6 +118,7 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
   }
 
   Future<void> _placeOrder() async {
+    // ── Validation ──
     if (_nameC.text.trim().isEmpty ||
         _phoneC.text.trim().isEmpty ||
         _addressC.text.trim().isEmpty) {
@@ -121,6 +128,34 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
               backgroundColor: Colors.red));
       return;
     }
+
+    if (_phoneC.text.trim().length != 11) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Phone number exactly 11 digits hona chahiye!'),
+              backgroundColor: Colors.orange));
+      return;
+    }
+
+    if (_selectedPaymentId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Please select a payment method!'),
+              backgroundColor: Colors.orange));
+      return;
+    }
+
+    final selectedMethod =
+    kPaymentMethods.firstWhere((m) => m.id == _selectedPaymentId);
+
+    if (selectedMethod.requiresAccount && _accC.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Please enter your account number!'),
+              backgroundColor: Colors.orange));
+      return;
+    }
+
     if (_availableKg <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -128,6 +163,7 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
               backgroundColor: Colors.red));
       return;
     }
+
     setState(() => _placing = true);
     try {
       final orderQty = _qtyC.text.trim().isNotEmpty
@@ -135,17 +171,21 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
           : _selectedKg;
 
       await supabase.from('orders').insert({
-        'product_id'    : widget.product['id'],
-        'product_title' : widget.product['title'],
-        'product_price' : widget.product['price'],
-        'seller_name'   : widget.product['seller_name'],
-        'seller_type'   : widget.product['seller_type'],
-        'buyer_name'    : _nameC.text.trim(),
-        'buyer_phone'   : _phoneC.text.trim(),
-        'buyer_address' : _addressC.text.trim(),
-        'quantity'      : orderQty.toInt() > 0 ? orderQty.toInt() : 1,
-        'status'        : 'pending',
-        'created_at'    : DateTime.now().toIso8601String(),
+        'product_id'     : widget.product['id'],
+        'product_title'  : widget.product['title'],
+        'product_price'  : widget.product['price'],
+        'seller_name'    : widget.product['seller_name'],
+        'seller_type'    : 'farmer',
+        'buyer_name'     : _nameC.text.trim(),
+        'buyer_phone'    : _phoneC.text.trim(),
+        'buyer_address'  : _addressC.text.trim(),
+        'quantity'       : orderQty.toInt() > 0 ? orderQty.toInt() : 1,
+        'status'         : 'pending',
+        'payment_method' : selectedMethod.name,
+        'payment_account': selectedMethod.requiresAccount
+            ? _accC.text.trim()
+            : null,
+        'created_at'     : DateTime.now().toIso8601String(),
       });
       setState(() { _placing = false; _step = 2; });
     } catch (e) {
@@ -242,7 +282,7 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Product Image with KG badge ──
+                // ── Product Image ──
                 Stack(
                   children: [
                     ClipRRect(
@@ -270,7 +310,6 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                           child: const Icon(Icons.image,
                               color: Colors.white54, size: 60)),
                     ),
-                    // ── KG Badge overlay on image ──
                     Positioned(
                       top: 12,
                       right: 12,
@@ -340,6 +379,7 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
 
                 const SizedBox(height: 8),
 
+                // ── Category & Location ──
                 Row(
                   children: [
                     Container(
@@ -353,7 +393,8 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                               color: Colors.greenAccent, fontSize: 12)),
                     ),
                     const SizedBox(width: 10),
-                    const Icon(Icons.location_on, color: Colors.white54, size: 14),
+                    const Icon(Icons.location_on,
+                        color: Colors.white54, size: 14),
                     Flexible(
                         child: Text(p['location'] ?? '',
                             style: GoogleFonts.poppins(
@@ -363,31 +404,29 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
 
                 const SizedBox(height: 16),
 
-                // ── KG AVAILABILITY CARD ──
                 _kgAvailabilityCard(),
                 const SizedBox(height: 12),
 
-                // ── KG SELECTOR (only if available) ──
                 if (!isUnavailable) ...[
                   _kgSelector(),
                   const SizedBox(height: 12),
                 ],
 
-                // ── Info Cards ──
+                // ── Seller Accepts ──
+                if (p['payment_method'] != null &&
+                    p['payment_method'].toString().isNotEmpty)
+                  _sellerAcceptsCard(p['payment_method']),
+
+                const SizedBox(height: 10),
+
                 _infoCard(
                     icon: Icons.description_outlined,
                     title: 'Description',
                     value: p['description'] ?? 'No description available.'),
                 const SizedBox(height: 10),
-                _infoCard(
-                    icon: Icons.payment,
-                    title: 'Payment Method',
-                    value: p['payment_method'] ?? 'Not specified'),
-                const SizedBox(height: 10),
                 _sellerCard(p),
                 const SizedBox(height: 24),
 
-                // ── Action Buttons ──
                 if (!isUnavailable) ...[
                   Row(
                     children: [
@@ -402,7 +441,8 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                                   fontWeight: FontWeight.w600)),
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: Colors.yellow),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            padding:
+                            const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14)),
                           ),
@@ -423,7 +463,8 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                                   fontWeight: FontWeight.bold)),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            padding:
+                            const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14)),
                           ),
@@ -438,8 +479,7 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: _openWhatsApp,
-                    icon:
-                    const Icon(Icons.chat, color: Colors.greenAccent),
+                    icon: const Icon(Icons.chat, color: Colors.greenAccent),
                     label: Text(
                         isUnavailable
                             ? 'Ask Farmer for Availability'
@@ -464,7 +504,67 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
     );
   }
 
-  // ── KG Availability Card ──
+  // ── Seller Accepts Card ──
+  Widget _sellerAcceptsCard(String paymentMethod) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.lightBlueAccent.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+                color: Colors.lightBlueAccent.withValues(alpha: 0.4)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.credit_card,
+                      color: Colors.lightBlueAccent, size: 18),
+                  const SizedBox(width: 8),
+                  Text('Seller Accepts',
+                      style: GoogleFonts.poppins(
+                          color: Colors.lightBlueAccent,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: paymentMethod
+                    .split('/')
+                    .map((m) => Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.lightBlueAccent
+                        .withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: Colors.lightBlueAccent
+                            .withValues(alpha: 0.5)),
+                  ),
+                  child: Text(m.trim(),
+                      style: GoogleFonts.poppins(
+                          color: Colors.lightBlueAccent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500)),
+                ))
+                    .toList(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _kgAvailabilityCard() {
     final bool isUnavailable = _availableKg <= 0;
     return ClipRRect(
@@ -495,8 +595,11 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  isUnavailable ? Icons.cancel_outlined : Icons.scale_outlined,
-                  color: isUnavailable ? Colors.redAccent : Colors.greenAccent,
+                  isUnavailable
+                      ? Icons.cancel_outlined
+                      : Icons.scale_outlined,
+                  color:
+                  isUnavailable ? Colors.redAccent : Colors.greenAccent,
                   size: 24,
                 ),
               ),
@@ -506,7 +609,9 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isUnavailable ? 'Currently Unavailable' : 'Farmer Stock',
+                      isUnavailable
+                          ? 'Currently Unavailable'
+                          : 'Farmer Stock',
                       style: GoogleFonts.poppins(
                           color: Colors.white54,
                           fontSize: 11,
@@ -528,25 +633,20 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                 ),
               ),
               if (!isUnavailable)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      _availableKg > 500
-                          ? '🟢 Bulk'
+                Text(
+                  _availableKg > 500
+                      ? '🟢 Bulk'
+                      : _availableKg > 100
+                      ? '🟡 Medium'
+                      : '🔴 Limited',
+                  style: GoogleFonts.poppins(
+                      color: _availableKg > 500
+                          ? Colors.greenAccent
                           : _availableKg > 100
-                          ? '🟡 Medium'
-                          : '🔴 Limited',
-                      style: GoogleFonts.poppins(
-                          color: _availableKg > 500
-                              ? Colors.greenAccent
-                              : _availableKg > 100
-                              ? Colors.yellow
-                              : Colors.redAccent,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ],
+                          ? Colors.yellow
+                          : Colors.redAccent,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600),
                 ),
             ],
           ),
@@ -555,7 +655,6 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
     );
   }
 
-  // ── KG Selector ──
   Widget _kgSelector() {
     final maxKg = _availableKg;
     return ClipRRect(
@@ -589,8 +688,6 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                 ],
               ),
               const SizedBox(height: 14),
-
-              // ── KG Slider ──
               Row(
                 children: [
                   Text('1',
@@ -611,7 +708,9 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                         value: _selectedKg.clamp(1, maxKg),
                         min: 1,
                         max: maxKg > 1 ? maxKg : 1,
-                        divisions: maxKg > 1 ? (maxKg - 1).toInt().clamp(1, 100) : 1,
+                        divisions: maxKg > 1
+                            ? (maxKg - 1).toInt().clamp(1, 100)
+                            : 1,
                         label: '${_selectedKg.toStringAsFixed(1)} KG',
                         onChanged: (val) {
                           setState(() => _selectedKg = val);
@@ -625,8 +724,6 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                           color: Colors.white54, fontSize: 11)),
                 ],
               ),
-
-              // ── Selected KG Display ──
               Center(
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -645,10 +742,7 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                   ),
                 ),
               ),
-
               const SizedBox(height: 10),
-
-              // ── Quick KG buttons ──
               Text('Quick Select:',
                   style: GoogleFonts.poppins(
                       color: Colors.white54, fontSize: 11)),
@@ -699,7 +793,10 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
     );
   }
 
-  Widget _infoCard({required IconData icon, required String title, required String value}) {
+  Widget _infoCard(
+      {required IconData icon,
+        required String title,
+        required String value}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: BackdropFilter(
@@ -767,9 +864,11 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                 ],
               ),
               const SizedBox(height: 10),
-              _sellerRow(Icons.person_outline, 'Name', p['seller_name'] ?? 'N/A'),
+              _sellerRow(Icons.person_outline, 'Name',
+                  p['seller_name'] ?? 'N/A'),
               const SizedBox(height: 6),
-              _sellerRow(Icons.badge_outlined, 'CNIC', p['seller_cnic'] ?? 'N/A'),
+              _sellerRow(Icons.badge_outlined, 'CNIC',
+                  p['seller_cnic'] ?? 'N/A'),
               const SizedBox(height: 6),
               _sellerRow(Icons.location_on_outlined, 'Location',
                   p['location'] ?? 'N/A'),
@@ -797,6 +896,7 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
     );
   }
 
+  // ── Buyer Form ──
   Widget _buildBuyerForm() {
     return Column(
       children: [
@@ -805,7 +905,8 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
           child: Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+                icon: const Icon(Icons.arrow_back_ios_new,
+                    color: Colors.white),
                 onPressed: () {
                   setState(() => _step = 0);
                   _fadeCtrl..reset()..forward();
@@ -825,142 +926,167 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Product + KG summary ──
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.10),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: Colors.white24)),
-                      child: Row(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: widget.product['image_url'] != null
-                                ? CachedNetworkImage(
-                                imageUrl: widget.product['image_url'],
-                                width: 60,
-                                height: 60,
-                                fit: BoxFit.cover,
-                                errorWidget: (_, __, ___) => Container(
-                                    width: 60,
-                                    height: 60,
-                                    color: Colors.grey.shade800,
-                                    child: const Icon(Icons.image,
-                                        color: Colors.white54)))
-                                : Container(
-                                width: 60,
-                                height: 60,
-                                color: Colors.grey.shade800,
+                // ── Product Summary Card ──
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A2535),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.12)),
+                  ),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: widget.product['image_url'] != null
+                            ? CachedNetworkImage(
+                            imageUrl: widget.product['image_url'],
+                            width: 64,
+                            height: 64,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => Container(
+                                width: 64,
+                                height: 64,
+                                color: const Color(0xFF0D1B2A),
                                 child: const Icon(Icons.image,
-                                    color: Colors.white54)),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(widget.product['title'] ?? '',
-                                    style: GoogleFonts.poppins(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14)),
-                                const SizedBox(height: 4),
-                                Text(widget.product['price'] ?? '',
-                                    style: GoogleFonts.poppins(
-                                        color: Colors.greenAccent,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600)),
-                                const SizedBox(height: 4),
-                                // ── KG selected summary ──
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green.withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(
-                                        color: Colors.greenAccent
-                                            .withValues(alpha: 0.4)),
-                                  ),
-                                  child: Text(
-                                    '📦 ${_selectedKg.toStringAsFixed(1)} KG selected',
-                                    style: GoogleFonts.poppins(
-                                        color: Colors.greenAccent,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                                    color: Colors.white38)))
+                            : Container(
+                            width: 64,
+                            height: 64,
+                            color: const Color(0xFF0D1B2A),
+                            child: const Icon(Icons.image,
+                                color: Colors.white38)),
                       ),
-                    ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(widget.product['title'] ?? '',
+                                style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15)),
+                            const SizedBox(height: 4),
+                            Text(widget.product['price'] ?? '',
+                                style: GoogleFonts.poppins(
+                                    color: Colors.greenAccent,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14)),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                    color: Colors.greenAccent
+                                        .withValues(alpha: 0.6)),
+                              ),
+                              child: Text(
+                                '📦 ${_selectedKg.toStringAsFixed(1)} KG selected',
+                                style: GoogleFonts.poppins(
+                                    color: Colors.greenAccent,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+
                 const SizedBox(height: 20),
+
                 Text('Enter Your Details',
                     style: GoogleFonts.poppins(
                         color: Colors.yellow,
                         fontSize: 16,
                         fontWeight: FontWeight.bold)),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
+
+                // ── Name ──
                 _formField('Your Name', _nameC, Icons.person_outline),
                 const SizedBox(height: 12),
-                _formField('Phone Number', _phoneC, Icons.phone_outlined,
-                    type: TextInputType.phone),
+
+                // ── Phone — max 11 digits ──
+                TextField(
+                  controller: _phoneC,
+                  keyboardType: TextInputType.phone,
+                  maxLength: 11,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Phone Number (11 digits)',
+                    labelStyle: GoogleFonts.poppins(color: Colors.white60),
+                    prefixIcon: const Icon(Icons.phone_outlined,
+                        color: Colors.greenAccent),
+                    filled: true,
+                    fillColor: const Color(0xFF1A2535),
+                    counterStyle: GoogleFonts.poppins(
+                        color: Colors.white38, fontSize: 11),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.12))),
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide:
+                        const BorderSide(color: Colors.greenAccent)),
+                  ),
+                ),
                 const SizedBox(height: 12),
+
+                // ── Address ──
                 _formField('Delivery Address', _addressC,
                     Icons.location_on_outlined,
                     maxLines: 3),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                      color: Colors.yellow.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: Colors.yellow.withValues(alpha: 0.4))),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.payment, color: Colors.yellow, size: 18),
-                      const SizedBox(width: 8),
-                      Flexible(
-                          child: Text(
-                              'Payment: ${widget.product['payment_method'] ?? 'Ask the farmer'}',
-                              style: GoogleFonts.poppins(
-                                  color: Colors.yellow, fontSize: 12))),
-                    ],
+                const SizedBox(height: 20),
+
+                // ── Payment Method Selector ──
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: PaymentSelector(
+                        selectedId: _selectedPaymentId,
+                        onChanged: (id) =>
+                            setState(() => _selectedPaymentId = id),
+                        accountController: _accC,
+                        accentColor: Colors.greenAccent,
+                      ),
+                    ),
                   ),
                 ),
+
                 const SizedBox(height: 24),
+
+                // ── Place Order Button ──
                 SizedBox(
                   width: double.infinity,
+                  height: 54,
                   child: ElevatedButton(
                     onPressed: _placing ? null : _placeOrder,
                     style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16))),
                     child: _placing
-                        ? const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                  color: Colors.white, strokeWidth: 2)),
-                          SizedBox(width: 12),
-                          Text('Placing Order...',
-                              style: TextStyle(color: Colors.white))
-                        ])
+                        ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2.5))
                         : Text('Place Order',
                         style: GoogleFonts.poppins(
                             color: Colors.white,
@@ -989,10 +1115,11 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
         labelStyle: GoogleFonts.poppins(color: Colors.white60),
         prefixIcon: Icon(icon, color: Colors.greenAccent),
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.08),
+        fillColor: const Color(0xFF1A2535),
         enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Colors.white24)),
+            borderSide:
+            BorderSide(color: Colors.white.withValues(alpha: 0.12))),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
             borderSide: const BorderSide(color: Colors.greenAccent)),
@@ -1027,7 +1154,8 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
             const SizedBox(height: 12),
             Text('The farmer will contact you shortly.',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(color: Colors.white60, fontSize: 14)),
+                style: GoogleFonts.poppins(
+                    color: Colors.white60, fontSize: 14)),
             const SizedBox(height: 24),
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
@@ -1052,6 +1180,14 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                       const SizedBox(height: 8),
                       _summaryRow('Phone', _phoneC.text),
                       const SizedBox(height: 8),
+                      if (_selectedPaymentId != null)
+                        _summaryRow(
+                            'Payment',
+                            kPaymentMethods
+                                .firstWhere(
+                                    (m) => m.id == _selectedPaymentId)
+                                .name),
+                      const SizedBox(height: 8),
                       _summaryRow('Status', '⏳ Pending'),
                     ],
                   ),
@@ -1064,10 +1200,12 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
               child: ElevatedButton.icon(
                 onPressed: () =>
                     Navigator.popUntil(context, (route) => route.isFirst),
-                icon: const Icon(Icons.home_outlined, color: Colors.white),
+                icon:
+                const Icon(Icons.home_outlined, color: Colors.white),
                 label: Text('Back to Dashboard',
                     style: GoogleFonts.poppins(
-                        color: Colors.white, fontWeight: FontWeight.bold)),
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1081,7 +1219,8 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
               icon: const Icon(Icons.chat, color: Colors.greenAccent),
               label: Text('Contact Farmer on WhatsApp',
                   style: GoogleFonts.poppins(
-                      color: Colors.greenAccent, fontWeight: FontWeight.w600)),
+                      color: Colors.greenAccent,
+                      fontWeight: FontWeight.w600)),
               style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Colors.greenAccent),
                   padding: const EdgeInsets.symmetric(
@@ -1100,7 +1239,8 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label,
-            style: GoogleFonts.poppins(color: Colors.white60, fontSize: 13)),
+            style:
+            GoogleFonts.poppins(color: Colors.white60, fontSize: 13)),
         Flexible(
             child: Text(value,
                 textAlign: TextAlign.end,

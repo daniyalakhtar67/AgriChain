@@ -1,4 +1,6 @@
 import 'dart:ui';
+import 'package:argichain/screens/farmer/payment.dart';
+import 'package:argichain/utils/payment_methods.dart'; // ← ADDED
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -18,6 +20,11 @@ class _CartScreenState extends State<CartScreen> {
   final _nameC    = TextEditingController();
   final _phoneC   = TextEditingController();
   final _addressC = TextEditingController();
+
+  // ── ADDED: payment controllers ──
+  final _accNumberC = TextEditingController();
+  String? _selectedPaymentId;
+
   bool _placing   = false;
   bool _showForm  = false;
 
@@ -32,6 +39,7 @@ class _CartScreenState extends State<CartScreen> {
     _nameC.dispose();
     _phoneC.dispose();
     _addressC.dispose();
+    _accNumberC.dispose(); // ← ADDED
     super.dispose();
   }
 
@@ -80,6 +88,7 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Future<void> placeAllOrders() async {
+    // ── UPDATED: validation mein payment bhi check karo ──
     if (_nameC.text.trim().isEmpty ||
         _phoneC.text.trim().isEmpty ||
         _addressC.text.trim().isEmpty) {
@@ -90,6 +99,25 @@ class _CartScreenState extends State<CartScreen> {
       return;
     }
 
+    if (_selectedPaymentId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Payment method select karo! 💳'),
+              backgroundColor: Colors.orange));
+      return;
+    }
+
+    final selectedMethod =
+    kPaymentMethods.firstWhere((m) => m.id == _selectedPaymentId);
+
+    if (selectedMethod.requiresAccount && _accNumberC.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Account number daalo!'),
+              backgroundColor: Colors.orange));
+      return;
+    }
+
     setState(() => _placing = true);
 
     try {
@@ -97,25 +125,28 @@ class _CartScreenState extends State<CartScreen> {
         final productId = item['product_id']?.toString().trim() ?? '';
         final orderedQty = int.tryParse(item['quantity'].toString()) ?? 1;
 
-        // ── 1. Order insert ──
+        // ── Order insert — payment info bhi save karo ──
         await supabase.from('orders').insert({
-          'product_id'    : productId,
-          'product_title' : item['product_title'] ?? '',
-          'product_price' : item['product_price'] ?? '',
-          'seller_name'   : item['seller_name'] ?? '',
-          'seller_type'   : item['seller_type'] ?? 'shopkeeper',
-          'buyer_name'    : _nameC.text.trim(),
-          'buyer_phone'   : _phoneC.text.trim(),
-          'buyer_address' : _addressC.text.trim(),
-          'quantity'      : orderedQty,
-          'status'        : 'pending',
-          'created_at'    : DateTime.now().toIso8601String(),
+          'product_id'      : productId,
+          'product_title'   : item['product_title'] ?? '',
+          'product_price'   : item['product_price'] ?? '',
+          'seller_name'     : item['seller_name'] ?? '',
+          'seller_type'     : item['seller_type'] ?? 'shopkeeper',
+          'buyer_name'      : _nameC.text.trim(),
+          'buyer_phone'     : _phoneC.text.trim(),
+          'buyer_address'   : _addressC.text.trim(),
+          'payment_method'  : selectedMethod.name,          // ← ADDED
+          'payment_account' : selectedMethod.requiresAccount // ← ADDED
+              ? _accNumberC.text.trim()
+              : null,
+          'quantity'        : orderedQty,
+          'status'          : 'pending',
+          'created_at'      : DateTime.now().toIso8601String(),
         });
 
-        // ── 2. stock_quantity deduct (Supabase RPC se — UUID issue fix) ──
+        // ── Stock deduct ──
         if (productId.isNotEmpty) {
           try {
-            // Current stock fetch karo
             final res = await supabase
                 .from('products')
                 .select('stock_quantity')
@@ -130,12 +161,9 @@ class _CartScreenState extends State<CartScreen> {
                   .from('products')
                   .update({'stock_quantity': newStock})
                   .filter('id', 'eq', productId);
-
-              debugPrint('✅ Stock updated: $currentStock → $newStock for $productId');
             }
           } catch (stockErr) {
             debugPrint('⚠️ Stock deduct error: $stockErr');
-            // Order cancel nahi hoga agar stock update fail ho
           }
         }
       }
@@ -144,6 +172,8 @@ class _CartScreenState extends State<CartScreen> {
       setState(() {
         _placing = false;
         _showForm = false;
+        _selectedPaymentId = null; // ← reset
+        _accNumberC.clear();       // ← reset
       });
 
       if (mounted) {
@@ -171,8 +201,8 @@ class _CartScreenState extends State<CartScreen> {
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
                   onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.pop(context);
+                    int popCount = 0;
+                    Navigator.of(context).popUntil((_) => popCount++ >= 2);
                   },
                   child: Text('Back to Dashboard',
                       style: GoogleFonts.poppins(color: Colors.white)),
@@ -191,6 +221,7 @@ class _CartScreenState extends State<CartScreen> {
       }
     }
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -203,9 +234,9 @@ class _CartScreenState extends State<CartScreen> {
           SafeArea(
             child: Column(
               children: [
+                // ── AppBar ──
                 Padding(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Row(
                     children: [
                       GestureDetector(
@@ -216,8 +247,7 @@ class _CartScreenState extends State<CartScreen> {
                               color: Colors.white.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: Colors.white24)),
-                          child:
-                          const Icon(Icons.arrow_back, color: Colors.white),
+                          child: const Icon(Icons.arrow_back, color: Colors.white),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -264,11 +294,12 @@ class _CartScreenState extends State<CartScreen> {
                     ],
                   ),
                 ),
+
+                // ── Body ──
                 Expanded(
                   child: isLoading
                       ? const Center(
-                      child:
-                      CircularProgressIndicator(color: Colors.green))
+                      child: CircularProgressIndicator(color: Colors.green))
                       : cartItems.isEmpty
                       ? Center(
                     child: Column(
@@ -287,33 +318,32 @@ class _CartScreenState extends State<CartScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
                       children: [
+                        // ── Cart Items ──
                         ...cartItems.map((item) => _CartItem(
                           item: item,
-                          onRemove: () =>
-                              removeFromCart(item['id']),
+                          onRemove: () => removeFromCart(item['id']),
                           onQtyChange: (qty) async {
                             await supabase
                                 .from('farmer_cart')
-                                .update({'quantity': qty}).eq(
-                                'id', item['id']);
+                                .update({'quantity': qty})
+                                .eq('id', item['id']);
                             fetchCart();
                           },
                         )),
+
                         const SizedBox(height: 16),
+
+                        // ── Total Items ──
                         ClipRRect(
                           borderRadius: BorderRadius.circular(14),
                           child: BackdropFilter(
-                            filter: ImageFilter.blur(
-                                sigmaX: 8, sigmaY: 8),
+                            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
                             child: Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                  color: Colors.white
-                                      .withValues(alpha: 0.10),
-                                  borderRadius:
-                                  BorderRadius.circular(14),
-                                  border: Border.all(
-                                      color: Colors.white24)),
+                                  color: Colors.white.withValues(alpha: 0.10),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: Colors.white24)),
                               child: Row(
                                 mainAxisAlignment:
                                 MainAxisAlignment.spaceBetween,
@@ -326,20 +356,22 @@ class _CartScreenState extends State<CartScreen> {
                                       style: GoogleFonts.poppins(
                                           color: Colors.greenAccent,
                                           fontSize: 16,
-                                          fontWeight:
-                                          FontWeight.bold)),
+                                          fontWeight: FontWeight.bold)),
                                 ],
                               ),
                             ),
                           ),
                         ),
+
                         const SizedBox(height: 16),
+
+                        // ── Checkout Form ──
                         if (_showForm) ...[
                           ClipRRect(
                             borderRadius: BorderRadius.circular(16),
                             child: BackdropFilter(
-                              filter: ImageFilter.blur(
-                                  sigmaX: 8, sigmaY: 8),
+                              filter:
+                              ImageFilter.blur(sigmaX: 8, sigmaY: 8),
                               child: Container(
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
@@ -347,8 +379,8 @@ class _CartScreenState extends State<CartScreen> {
                                         .withValues(alpha: 0.10),
                                     borderRadius:
                                     BorderRadius.circular(16),
-                                    border: Border.all(
-                                        color: Colors.white24)),
+                                    border:
+                                    Border.all(color: Colors.white24)),
                                 child: Column(
                                   crossAxisAlignment:
                                   CrossAxisAlignment.start,
@@ -357,8 +389,7 @@ class _CartScreenState extends State<CartScreen> {
                                         style: GoogleFonts.poppins(
                                             color: Colors.yellow,
                                             fontSize: 16,
-                                            fontWeight:
-                                            FontWeight.bold)),
+                                            fontWeight: FontWeight.bold)),
                                     const SizedBox(height: 12),
                                     _formField('Your Name', _nameC,
                                         Icons.person_outline),
@@ -367,14 +398,31 @@ class _CartScreenState extends State<CartScreen> {
                                         'Phone Number',
                                         _phoneC,
                                         Icons.phone_outlined,
-                                        type:
-                                        TextInputType.phone),
+                                        type: TextInputType.phone),
                                     const SizedBox(height: 10),
                                     _formField(
                                         'Delivery Address',
                                         _addressC,
                                         Icons.location_on_outlined,
                                         maxLines: 2),
+
+                                    const SizedBox(height: 16),
+                                    const Divider(color: Colors.white24),
+                                    const SizedBox(height: 12),
+
+                                    // ── ADDED: Payment Selector ──
+                                    StatefulBuilder(
+                                      builder: (ctx, setS) => PaymentSelector(
+                                        selectedId: _selectedPaymentId,
+                                        onChanged: (id) {
+                                          setState(() =>
+                                          _selectedPaymentId = id);
+                                          setS(() {});
+                                        },
+                                        accountController: _accNumberC,
+                                        accentColor: Colors.greenAccent,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -382,6 +430,8 @@ class _CartScreenState extends State<CartScreen> {
                           ),
                           const SizedBox(height: 16),
                         ],
+
+                        // ── Checkout Button ──
                         SizedBox(
                           width: double.infinity,
                           height: 52,
@@ -395,8 +445,7 @@ class _CartScreenState extends State<CartScreen> {
                                 ? null
                                 : () {
                               if (!_showForm) {
-                                setState(
-                                        () => _showForm = true);
+                                setState(() => _showForm = true);
                               } else {
                                 placeAllOrders();
                               }
@@ -463,14 +512,13 @@ class _CartScreenState extends State<CartScreen> {
   }
 }
 
+// ── Cart Item Widget (unchanged) ─────────────────────────────────────────────
 class _CartItem extends StatelessWidget {
   final Map<String, dynamic> item;
   final VoidCallback onRemove;
   final Function(int) onQtyChange;
   const _CartItem(
-      {required this.item,
-        required this.onRemove,
-        required this.onQtyChange});
+      {required this.item, required this.onRemove, required this.onQtyChange});
 
   @override
   Widget build(BuildContext context) {
@@ -485,8 +533,7 @@ class _CartItem extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                bottomLeft: Radius.circular(16)),
+                topLeft: Radius.circular(16), bottomLeft: Radius.circular(16)),
             child: item['product_image'] != null
                 ? CachedNetworkImage(
                 imageUrl: item['product_image'],
@@ -503,13 +550,11 @@ class _CartItem extends StatelessWidget {
                 width: 90,
                 height: 90,
                 color: Colors.grey.shade800,
-                child:
-                const Icon(Icons.image, color: Colors.white54)),
+                child: const Icon(Icons.image, color: Colors.white54)),
           ),
           Expanded(
             child: Padding(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -534,15 +579,13 @@ class _CartItem extends StatelessWidget {
                         child: Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
-                                color:
-                                Colors.white.withValues(alpha: 0.1),
+                                color: Colors.white.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6)),
                             child: const Icon(Icons.remove,
                                 color: Colors.white, size: 16)),
                       ),
                       Padding(
-                          padding:
-                          const EdgeInsets.symmetric(horizontal: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
                           child: Text('$qty',
                               style: GoogleFonts.poppins(
                                   color: Colors.white,
@@ -552,8 +595,7 @@ class _CartItem extends StatelessWidget {
                         child: Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
-                                color:
-                                Colors.green.withValues(alpha: 0.3),
+                                color: Colors.green.withValues(alpha: 0.3),
                                 borderRadius: BorderRadius.circular(6)),
                             child: const Icon(Icons.add,
                                 color: Colors.greenAccent, size: 16)),

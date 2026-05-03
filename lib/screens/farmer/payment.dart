@@ -25,7 +25,6 @@ const List<PaymentMethod> kPaymentMethods = [
   PaymentMethod(id: 'meezan',      name: 'Meezan Bank', icon: '🕌', requiresAccount: true),
   PaymentMethod(id: 'ubl',         name: 'UBL',         icon: '🏛️', requiresAccount: true),
   PaymentMethod(id: 'habib',       name: 'Habib Bank',  icon: '🏦', requiresAccount: true),
-  PaymentMethod(id: 'cash',        name: 'Cash',        icon: '💵', requiresAccount: false),
   PaymentMethod(id: 'cash_on_del', name: 'Cash on Del.',icon: '🚚', requiresAccount: false),
 ];
 
