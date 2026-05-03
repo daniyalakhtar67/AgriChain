@@ -235,7 +235,7 @@ class _SellItemsTabState extends State<_SellItemsTab> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                         content: Text(
-                            'Title, Category, Price zaroori hain!'),
+                            'Title, Category and Price are required!'),
                         backgroundColor: Colors.red),
                   );
                   return;
@@ -400,13 +400,13 @@ class _SellItemsTabState extends State<_SellItemsTab> {
                       const Icon(Icons.store_outlined,
                           color: Colors.white24, size: 80),
                       const SizedBox(height: 16),
-                      Text('Koi item nahi hai abhi',
+                      Text('No items listed yet',
                           style: GoogleFonts.poppins(
                               color: Colors.white60,
                               fontSize: 16)),
                       const SizedBox(height: 8),
                       Text(
-                          '+ button dabao aur item add karo',
+                          'Tap + to add your first item',
                           style: GoogleFonts.poppins(
                               color: Colors.white38,
                               fontSize: 13)),
@@ -668,7 +668,7 @@ class _ShopkeeperItemDetailState extends State<_ShopkeeperItemDetail> {
         backgroundColor: Colors.grey.shade900,
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20)),
-        title: Text('Stock Set Karo',
+        title: Text('Set Stock',
             style: GoogleFonts.poppins(
                 color: Colors.yellow, fontWeight: FontWeight.bold)),
         content: TextField(
@@ -676,7 +676,7 @@ class _ShopkeeperItemDetailState extends State<_ShopkeeperItemDetail> {
           keyboardType: TextInputType.number,
           style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
-            labelText: 'Nai quantity',
+            labelText: 'New quantity',
             labelStyle: const TextStyle(color: Colors.yellow),
             prefixIcon: const Icon(Icons.inventory_2_outlined,
                 color: Colors.yellow),
@@ -702,7 +702,7 @@ class _ShopkeeperItemDetailState extends State<_ShopkeeperItemDetail> {
               if (val == null || val < 0) {
                 ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content: Text('Valid number likho!'),
+                        content: Text('Please enter a valid number!'),
                         backgroundColor: Colors.red));
                 return;
               }
@@ -1117,7 +1117,7 @@ class _OrdersTabState extends State<_OrdersTab> {
           SnackBar(
             content: Text(status == 'done'
                 ? 'Order complete! ✅'
-                : 'Order pending ho gaya!'),
+                : 'Order marked as pending!'),
             backgroundColor:
             status == 'done' ? Colors.green : Colors.orange,
           ),
@@ -1135,7 +1135,7 @@ class _OrdersTabState extends State<_OrdersTab> {
   Future<void> _openWhatsApp(
       String phone, String buyerName, String productTitle) async {
     final message = Uri.encodeComponent(
-        'Assalam o Alaikum $buyerName! Aapka "$productTitle" ka order receive ho gaya hai.');
+        'Assalam o Alaikum $buyerName! Your order for "$productTitle" has been received.');
     final cleanPhone =
     phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
     final Uri uri = cleanPhone.isNotEmpty
@@ -1278,8 +1278,8 @@ class _OrdersTabState extends State<_OrdersTab> {
                       const SizedBox(height: 16),
                       Text(
                           _filter == 'all'
-                              ? 'Koi order nahi abhi'
-                              : 'Is category mein koi order nahi',
+                              ? 'No orders yet'
+                              : 'No orders in this category',
                           style: GoogleFonts.poppins(
                               color: Colors.white60,
                               fontSize: 15)),
@@ -1674,7 +1674,7 @@ class _ProfileTab extends StatelessWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                         content:
-                        Text('Name khali nahi ho sakta!'),
+                        Text('Name cannot be empty!'),
                         backgroundColor: Colors.red),
                   );
                   return;

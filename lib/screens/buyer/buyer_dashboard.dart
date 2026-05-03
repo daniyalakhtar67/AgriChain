@@ -537,7 +537,7 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
                 if (nameC.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content: Text('Name khali nahi ho sakta!'),
+                        content: Text('Name cannot be empty!'),
                         backgroundColor: Colors.red),
                   );
                   return;

@@ -482,7 +482,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text('⚠️ Payment karne ke baad screenshot zaroor bhejein',
+                Text('⚠️ Please send a screenshot after making the payment',
                     style:
                     GoogleFonts.poppins(color: Colors.white54, fontSize: 11)),
               ],
@@ -875,7 +875,7 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
     // ── ADDED: payment validation ──
     if (_selectedPaymentId == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Apna payment method select karo! 💳'),
+          content: Text('Please select a payment method! 💳'),
           backgroundColor: Colors.orange));
       return;
     }
@@ -885,7 +885,7 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
 
     if (selectedMethod.requiresAccount && _accNumberC.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Account number daalo!'),
+          content: Text('Please enter your account number!'),
           backgroundColor: Colors.orange));
       return;
     }
@@ -1196,7 +1196,7 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    '⚠️ Payment karne ke baad screenshot send karein',
+                                    '⚠️ Please send a screenshot after making the payment',
                                     style: GoogleFonts.poppins(
                                         color: Colors.white54, fontSize: 11),
                                   ),

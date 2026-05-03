@@ -102,7 +102,7 @@ class _CartScreenState extends State<CartScreen> {
     if (_selectedPaymentId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Payment method select karo! 💳'),
+              content: Text('Please select a payment method! 💳'),
               backgroundColor: Colors.orange));
       return;
     }
@@ -113,7 +113,7 @@ class _CartScreenState extends State<CartScreen> {
     if (selectedMethod.requiresAccount && _accNumberC.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Account number daalo!'),
+              content: Text('Please enter your account number!'),
               backgroundColor: Colors.orange));
       return;
     }

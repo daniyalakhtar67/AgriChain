@@ -1,8 +1,3 @@
-// lib/screens/farmer/farmer_dashboard.dart
-// ── FIXES:
-//    1. _ProductCard now has "+ Add" button that adds directly to cart
-//    2. Payment method shown correctly on crop listing
-// ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:ui';
 import 'package:argichain/screens/farmer/cart_screen.dart';
@@ -805,7 +800,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                     ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                             content: Text(
-                                'Payment method select karo!'),
+                                'Please select a payment method!'),
                             backgroundColor: Colors.orange));
                     return;
                   }
@@ -813,7 +808,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                       accNumberC.text.trim().isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                            content: Text('Account number daalo!'),
+                            content: Text('Please enter your account number!'),
                             backgroundColor: Colors.orange));
                     return;
                   }
@@ -877,7 +872,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
       setState(() {});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Crop Removed!'),
+            content: Text('Crop Deleted!'),
             backgroundColor: Colors.red));
       }
     } catch (e) {

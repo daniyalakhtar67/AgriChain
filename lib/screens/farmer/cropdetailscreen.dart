@@ -453,7 +453,7 @@ class _CropDetailScreenState extends State<CropDetailScreen> {
                                       onPressed: _showCustomAmountDialog,
                                       icon: const Icon(Icons.edit,
                                           color: Colors.yellow, size: 16),
-                                      label: Text('Custom Amount Set Karo',
+                                      label: Text('Set Custom Amount',
                                           style: GoogleFonts.poppins(
                                               color: Colors.yellow,
                                               fontSize: 13,

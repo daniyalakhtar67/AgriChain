@@ -132,7 +132,7 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
     if (_phoneC.text.trim().length != 11) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Phone number exactly 11 digits hona chahiye!'),
+              content: Text('Phone number must be exactly 11 digits!'),
               backgroundColor: Colors.orange));
       return;
     }

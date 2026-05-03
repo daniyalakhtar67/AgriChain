@@ -1,3 +1,6 @@
+// lib/screens/welcome.dart  ← UPDATED: Admin button added
+import 'package:argichain/screens/admin/admin_login.dart';
+import 'package:argichain/screens/admin/admin_login_screen.dart';
 import 'package:argichain/screens/buyer/buyer_login.dart';
 import 'package:argichain/screens/farmer/farmer_login.dart';
 import 'package:argichain/screens/shopkeeper/shopkepper_login.dart';
@@ -29,11 +32,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     );
-    _fadeAnim = CurvedAnimation(parent: _fadeController, curve: Curves.easeIn);
+    _fadeAnim =
+        CurvedAnimation(parent: _fadeController, curve: Curves.easeIn);
     _slideAnim = Tween<Offset>(
       begin: const Offset(0, 0.3),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOut));
+    ).animate(CurvedAnimation(
+        parent: _slideController, curve: Curves.easeOut));
 
     _fadeController.forward();
     Future.delayed(const Duration(milliseconds: 300), () {
@@ -68,7 +73,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-
                   // ── TOP TITLE ──
                   Padding(
                     padding: const EdgeInsets.only(top: 50),
@@ -77,11 +81,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         ClipRRect(
                           borderRadius: BorderRadius.circular(20),
                           child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                            filter: ImageFilter.blur(
+                                sigmaX: 15, sigmaY: 15),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 28, vertical: 14),
-                              color: Colors.black.withValues(alpha: 0.3),
+                              color:
+                              Colors.black.withValues(alpha: 0.3),
                               child: RichText(
                                 text: TextSpan(
                                   text: 'WELCOME TO ',
@@ -120,7 +126,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     ),
                   ),
 
-                  // ── BUTTONS ──
+                  // ── ROLE BUTTONS ──
                   SlideTransition(
                     position: _slideAnim,
                     child: Column(
@@ -147,7 +153,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (_) => const ShopkeeperLogin()),
+                                builder: (_) =>
+                                const ShopkeeperLogin()),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -167,35 +174,84 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     ),
                   ),
 
-                  // ── NOTES SECTION ──
+                  // ── BOTTOM SECTION ──
                   Padding(
                     padding: const EdgeInsets.only(
                         bottom: 24, left: 16, right: 16),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          color: Colors.black.withValues(alpha: 0.35),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _noteRow(Icons.agriculture,
-                                  'Farmer — Sell & purchase products'),
-                              const SizedBox(height: 8),
-                              _noteRow(Icons.store,
-                                  'Shopkeeper — Sell farming products'),
-                              const SizedBox(height: 8),
-                              _noteRow(Icons.shopping_basket,
-                                  'Buyer — Purchase crops & items'),
-                            ],
+                    child: Column(
+                      children: [
+                        // Notes card
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(
+                                sigmaX: 12, sigmaY: 12),
+                            child: Container(
+                              padding: const EdgeInsets.all(16),
+                              color:
+                              Colors.black.withValues(alpha: 0.35),
+                              child: Column(
+                                crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                                children: [
+                                  _noteRow(Icons.agriculture,
+                                      'Farmer — Sell & purchase products'),
+                                  const SizedBox(height: 8),
+                                  _noteRow(Icons.store,
+                                      'Shopkeeper — Sell farming products'),
+                                  const SizedBox(height: 8),
+                                  _noteRow(Icons.shopping_basket,
+                                      'Buyer — Purchase crops & items'),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+
+                        const SizedBox(height: 14),
+
+                        // ── ADMIN BUTTON (new) ──
+                        GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) =>
+                                const AdminLoginScreen()),
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 10),
+                            decoration: BoxDecoration(
+                              color:
+                              Colors.red.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                  color: Colors.redAccent
+                                      .withValues(alpha: 0.5)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                    Icons.admin_panel_settings,
+                                    color: Colors.redAccent,
+                                    size: 18),
+                                const SizedBox(width: 8),
+                                Text('Admin Login',
+                                    style: GoogleFonts.poppins(
+                                        color: Colors.redAccent,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600)),
+                                const SizedBox(width: 8),
+                                const Icon(Icons.arrow_forward_ios,
+                                    color: Colors.redAccent, size: 12),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-
                 ],
               ),
             ),
@@ -224,7 +280,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 }
 
-// ── ROLE BUTTON WIDGET ──
+// ── ROLE BUTTON WIDGET (unchanged) ──
 class _RoleButton extends StatefulWidget {
   final IconData icon;
   final String label;
@@ -263,7 +319,8 @@ class _RoleButtonState extends State<_RoleButton> {
         duration: const Duration(milliseconds: 100),
         child: Container(
           width: 300,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          padding:
+          const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           decoration: BoxDecoration(
             color: widget.color.withValues(alpha: 0.85),
             borderRadius: BorderRadius.circular(20),
@@ -281,7 +338,6 @@ class _RoleButtonState extends State<_RoleButton> {
           ),
           child: Row(
             children: [
-              // ICON CIRCLE
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
@@ -291,10 +347,10 @@ class _RoleButtonState extends State<_RoleButton> {
                     color: widget.accentColor.withValues(alpha: 0.4),
                   ),
                 ),
-                child: Icon(widget.icon, color: widget.accentColor, size: 28),
+                child: Icon(widget.icon,
+                    color: widget.accentColor, size: 28),
               ),
               const SizedBox(width: 16),
-              // TEXT
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -316,7 +372,6 @@ class _RoleButtonState extends State<_RoleButton> {
                 ],
               ),
               const Spacer(),
-              // ARROW
               Icon(
                 Icons.arrow_forward_ios,
                 color: widget.accentColor.withValues(alpha: 0.7),
