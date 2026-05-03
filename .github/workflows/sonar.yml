@@ -1,0 +1,48 @@
+name: SonarQube Cloud Analysis
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sonarqube:
+    name: Static Code Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout with full history (required for blame info)
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2. Setup Flutter
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+          channel: 'stable'
+          cache: true
+
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: flutter pub get
+
+      # 4. Run static analysis
+      - name: Flutter analyze
+        run: flutter analyze --no-fatal-infos
+
+      # 5. Run tests with coverage
+      - name: Run tests with coverage
+        run: flutter test --coverage
+
+      # 6. Run SonarQube scan
+      - name: SonarQube Cloud Scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
