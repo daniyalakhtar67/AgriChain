@@ -714,7 +714,6 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
 
   void _showAddCropDialog() {
     final titleC      = TextEditingController();
-    final categoryC   = TextEditingController();
     final priceC      = TextEditingController();
     final locationC   = TextEditingController();
     final imageC      = TextEditingController();
@@ -742,8 +741,6 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   dialogField('Title', titleC, Icons.title,
-                      accentColor: Colors.yellow),
-                  dialogField('Category', categoryC, Icons.category,
                       accentColor: Colors.yellow),
                   dialogField('Price', priceC, Icons.attach_money,
                       accentColor: Colors.yellow),
@@ -786,7 +783,6 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                     ? null
                     : () async {
                   if (titleC.text.isEmpty ||
-                      categoryC.text.isEmpty ||
                       priceC.text.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -835,7 +831,6 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
 
                     await supabase.from('products').insert({
                       'title': titleC.text.trim(),
-                      'category': categoryC.text.trim(),
                       'price': priceC.text.trim(),
                       'location': locationC.text.trim(),
                       'image_url': imageC.text.trim().isEmpty

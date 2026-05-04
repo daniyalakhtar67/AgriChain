@@ -1,15 +1,11 @@
-// lib/screens/admin/admin_login_screen.dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'admin_dashboard.dart';
-
-const String kAdminUsername = 'daniyal';
-const String kAdminPassword = '112233';
 
 class AdminLoginScreen extends StatefulWidget {
   const AdminLoginScreen({super.key});
-
   @override
   State<AdminLoginScreen> createState() => _AdminLoginScreenState();
 }
@@ -31,12 +27,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
     super.initState();
     _animCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 700));
-    _fadeAnim =
-        CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
-    _slideAnim =
-        Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero)
-            .animate(
-            CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut));
+    _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
+    _slideAnim = Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut));
     _animCtrl.forward();
   }
 
@@ -49,25 +42,53 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
   }
 
   Future<void> _login() async {
-    setState(() {
-      _error = null;
-      _loading = true;
-    });
-    await Future.delayed(const Duration(milliseconds: 600));
+    final username = _userC.text.trim().toLowerCase();
+    final password = _passC.text.trim();
 
-    if (_userC.text.trim() == kAdminUsername &&
-        _passC.text.trim() == kAdminPassword) {
+    if (username.isEmpty || password.isEmpty) {
+      setState(() => _error = 'Please fill in all fields.');
+      return;
+    }
+
+    setState(() { _error = null; _loading = true; });
+
+    try {
+      final supabase = Supabase.instance.client;
+
+      // Fetch admin from DB
+      final res = await supabase
+          .from('admins')
+          .select()
+          .eq('username', username)
+          .eq('is_active', true)
+          .maybeSingle();
+
+      if (res == null) {
+        setState(() { _error = 'Admin not found or inactive.'; _loading = false; });
+        return;
+      }
+
+      if (res['password'] != password) {
+        setState(() { _error = 'Incorrect password.'; _loading = false; });
+        return;
+      }
+
+      // Update last_login
+      await supabase
+          .from('admins')
+          .update({'last_login': DateTime.now().toIso8601String()})
+          .eq('id', res['id']);
+
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const AdminDashboard()),
+          MaterialPageRoute(
+            builder: (_) => AdminDashboard(adminData: res)
+          ),
         );
       }
-    } else {
-      setState(() {
-        _error = 'Invalid username or password!';
-        _loading = false;
-      });
+    } catch (e) {
+      setState(() { _error = 'Error: $e'; _loading = false; });
     }
   }
 
@@ -76,15 +97,11 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
     return Scaffold(
       body: Stack(
         children: [
-          // ── Background ──
           SizedBox.expand(
-            child: Image.asset('assets/images/W_bg.webp', fit: BoxFit.cover),
-          ),
+              child: Image.asset('assets/images/W_bg.webp', fit: BoxFit.cover)),
           SizedBox.expand(
-            child: Container(color: Colors.black.withValues(alpha: 0.78)),
-          ),
+              child: Container(color: Colors.black.withValues(alpha: 0.78))),
 
-          // ── Back Button Top-Left ──
           SafeArea(
             child: Align(
               alignment: Alignment.topLeft,
@@ -99,18 +116,14 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.white24),
                     ),
-                    child: const Icon(
-                      Icons.arrow_back_ios_new,
-                      color: Colors.white70,
-                      size: 18,
-                    ),
+                    child: const Icon(Icons.arrow_back_ios_new,
+                        color: Colors.white70, size: 18),
                   ),
                 ),
               ),
             ),
           ),
 
-          // ── Main Content ──
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
@@ -123,53 +136,37 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const SizedBox(height: 40),
-
-                        // ── Shield Icon ──
                         Container(
-                          width: 90,
-                          height: 90,
+                          width: 90, height: 90,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: Colors.red.withValues(alpha: 0.15),
-                            border: Border.all(
-                                color: Colors.redAccent, width: 2.5),
+                            border: Border.all(color: Colors.redAccent, width: 2.5),
                           ),
-                          child: const Icon(
-                              Icons.admin_panel_settings,
-                              color: Colors.redAccent,
-                              size: 46),
+                          child: const Icon(Icons.admin_panel_settings,
+                              color: Colors.redAccent, size: 46),
                         ),
-
                         const SizedBox(height: 20),
-
                         RichText(
                           text: TextSpan(children: [
                             TextSpan(
                                 text: 'Admin ',
                                 style: GoogleFonts.poppins(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
+                                    fontSize: 28, fontWeight: FontWeight.bold,
                                     color: Colors.white)),
                             TextSpan(
-                                text: 'Panel',
+                                text: 'Portal',
                                 style: GoogleFonts.poppins(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
+                                    fontSize: 28, fontWeight: FontWeight.bold,
                                     color: Colors.redAccent)),
                           ]),
                         ),
-
                         const SizedBox(height: 6),
-
-                        Text(
-                          'Only authorized admins can access this panel',
-                          style: GoogleFonts.poppins(
-                              color: Colors.white54, fontSize: 12),
-                        ),
-
+                        Text('Authorized person only',
+                            style: GoogleFonts.poppins(
+                                color: Colors.white54, fontSize: 12)),
                         const SizedBox(height: 36),
 
-                        // ── Login Card ──
                         ClipRRect(
                           borderRadius: BorderRadius.circular(20),
                           child: BackdropFilter(
@@ -196,54 +193,43 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                                     obscure: _obscure,
                                     suffix: IconButton(
                                       icon: Icon(
-                                        _obscure
-                                            ? Icons.visibility_off
-                                            : Icons.visibility,
-                                        color: Colors.white54,
-                                        size: 18,
-                                      ),
-                                      onPressed: () => setState(
-                                              () => _obscure = !_obscure),
+                                          _obscure ? Icons.visibility_off : Icons.visibility,
+                                          color: Colors.white54, size: 18),
+                                      onPressed: () =>
+                                          setState(() => _obscure = !_obscure),
                                     ),
                                   ),
-
                                   if (_error != null) ...[
                                     const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.error_outline,
-                                            color: Colors.redAccent,
-                                            size: 16),
-                                        const SizedBox(width: 6),
-                                        Text(_error!,
+                                    Row(children: [
+                                      const Icon(Icons.error_outline,
+                                          color: Colors.redAccent, size: 16),
+                                      const SizedBox(width: 6),
+                                      Flexible(
+                                        child: Text(_error!,
                                             style: GoogleFonts.poppins(
                                                 color: Colors.redAccent,
                                                 fontSize: 12)),
-                                      ],
-                                    ),
+                                      ),
+                                    ]),
                                   ],
-
                                   const SizedBox(height: 20),
-
                                   SizedBox(
-                                    width: double.infinity,
-                                    height: 50,
+                                    width: double.infinity, height: 50,
                                     child: ElevatedButton(
                                       onPressed: _loading ? null : _login,
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.redAccent,
                                         shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                            BorderRadius.circular(14)),
+                                            borderRadius: BorderRadius.circular(14)),
                                       ),
                                       child: _loading
                                           ? const SizedBox(
-                                          width: 22,
-                                          height: 22,
+                                          width: 22, height: 22,
                                           child: CircularProgressIndicator(
                                               color: Colors.white,
                                               strokeWidth: 2.5))
-                                          : Text('Login as Admin',
+                                          : Text('Login',
                                           style: GoogleFonts.poppins(
                                               color: Colors.white,
                                               fontWeight: FontWeight.bold,
@@ -255,7 +241,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                             ),
                           ),
                         ),
-
                         const SizedBox(height: 30),
                       ],
                     ),
@@ -283,8 +268,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
       onSubmitted: (_) => _login(),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle:
-        GoogleFonts.poppins(color: Colors.white60, fontSize: 13),
+        labelStyle: GoogleFonts.poppins(color: Colors.white60, fontSize: 13),
         prefixIcon: Icon(icon, color: Colors.redAccent, size: 20),
         suffixIcon: suffix,
         filled: true,
