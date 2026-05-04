@@ -1,4 +1,3 @@
-
 import 'dart:ui';
 import 'package:argichain/screens/farmer/cart_screen.dart';
 import 'package:argichain/screens/farmer/crop_detail_screen.dart';
@@ -28,17 +27,34 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
   bool isLoading = true;
   int _currentIndex = 0;
 
+  // FIX #4: _cropsFuture field
+  late Future<List<Map<String, dynamic>>> _cropsFuture;
+
   @override
   void initState() {
     super.initState();
     fetchShopkeeperProducts();
     searchController.addListener(_onSearch);
+    _reloadCrops(); // FIX #4
   }
 
   @override
   void dispose() {
     searchController.dispose();
     super.dispose();
+  }
+
+  // FIX #4: _reloadCrops method — also fixes Issue #1 via seller_name filter
+  void _reloadCrops() {
+    setState(() {
+      _cropsFuture = supabase
+          .from('products')
+          .select()
+          .eq('seller_type', 'farmer')
+          .eq('seller_name', widget.farmerName)
+          .order('created_at', ascending: false)
+          .then((data) => List<Map<String, dynamic>>.from(data));
+    });
   }
 
   Future<void> fetchShopkeeperProducts() async {
@@ -261,8 +277,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
               Expanded(
                 child: isLoading
                     ? const Center(
-                    child:
-                    CircularProgressIndicator(color: Colors.green))
+                    child: CircularProgressIndicator(color: Colors.green))
                     : filteredProducts.isEmpty
                     ? Center(
                     child: Text('No equipment found',
@@ -354,27 +369,23 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                 ),
               ),
               Expanded(
-                child: FutureBuilder(
-                  future: supabase
-                      .from('products')
-                      .select()
-                      .eq('seller_type', 'farmer')
-                      .order('created_at', ascending: false),
+                // FIX #4: Use _cropsFuture instead of inline future
+                child: FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _cropsFuture,
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(
                           child: CircularProgressIndicator(
                               color: Colors.green));
                     }
-                    final crops = List<Map<String, dynamic>>.from(
-                        snapshot.data ?? []);
+                    // FIX #4: snapshot.data is already typed list
+                    final crops = snapshot.data ?? [];
                     if (crops.isEmpty) {
                       return Center(
                           child: Text(
                             'No crops listed yet\nTap + to add',
                             textAlign: TextAlign.center,
-                            style:
-                            GoogleFonts.poppins(color: Colors.white70),
+                            style: GoogleFonts.poppins(color: Colors.white70),
                           ));
                     }
                     return ListView.builder(
@@ -391,24 +402,22 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                         final bool hasStock = kgVal > 0;
 
                         return GestureDetector(
+                          // FIX #4: _reloadCrops() after returning from detail
                           onTap: () async {
                             await Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) =>
-                                    CropDetailScreen(crop: crop),
+                                builder: (_) => CropDetailScreen(crop: crop),
                               ),
                             );
-                            setState(() {});
+                            _reloadCrops();
                           },
                           child: Container(
                             margin: const EdgeInsets.only(bottom: 12),
                             decoration: BoxDecoration(
-                              color:
-                              Colors.white.withValues(alpha: 0.12),
+                              color: Colors.white.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(16),
-                              border:
-                              Border.all(color: Colors.white24),
+                              border: Border.all(color: Colors.white24),
                             ),
                             child: ListTile(
                               leading: ClipRRect(
@@ -444,13 +453,12 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                                           .toString()
                                           .isNotEmpty)
                                     Padding(
-                                      padding: const EdgeInsets.only(
-                                          bottom: 4),
+                                      padding:
+                                      const EdgeInsets.only(bottom: 4),
                                       child: Text(
                                         '💳 ${crop['payment_method']}',
                                         style: GoogleFonts.poppins(
-                                            color:
-                                            Colors.lightBlueAccent,
+                                            color: Colors.lightBlueAccent,
                                             fontSize: 11),
                                       ),
                                     ),
@@ -459,10 +467,8 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                                         horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: hasStock
-                                          ? Colors.green
-                                          .withValues(alpha: 0.3)
-                                          : Colors.red
-                                          .withValues(alpha: 0.3),
+                                          ? Colors.green.withValues(alpha: 0.3)
+                                          : Colors.red.withValues(alpha: 0.3),
                                       borderRadius:
                                       BorderRadius.circular(6),
                                       border: Border.all(
@@ -470,8 +476,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                                               ? Colors.greenAccent
                                               .withValues(alpha: 0.6)
                                               : Colors.redAccent
-                                              .withValues(
-                                              alpha: 0.6)),
+                                              .withValues(alpha: 0.6)),
                                     ),
                                     child: Text(
                                       hasStock
@@ -490,8 +495,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                               trailing: IconButton(
                                 icon: const Icon(Icons.delete,
                                     color: Colors.redAccent),
-                                onPressed: () =>
-                                    _deleteCrop(crop['id']),
+                                onPressed: () => _deleteCrop(crop['id']),
                               ),
                             ),
                           ),
@@ -708,7 +712,6 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
     );
   }
 
-  // ── ADD CROP DIALOG ───────────────────────────────────────────────────────
   void _showAddCropDialog() {
     final titleC      = TextEditingController();
     final categoryC   = TextEditingController();
@@ -716,28 +719,24 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
     final locationC   = TextEditingController();
     final imageC      = TextEditingController();
     final quantityKgC = TextEditingController();
-    final accNumberC  = TextEditingController();
 
-    String? selectedPaymentId;
+    List<String> selectedPaymentIds = [];
+    final Map<String, TextEditingController> accControllers = {};
+
     bool saving = false;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
-          final selectedMethod = selectedPaymentId != null
-              ? kPaymentMethods
-              .firstWhere((m) => m.id == selectedPaymentId)
-              : null;
-          final needsAccount = selectedMethod?.requiresAccount ?? false;
-
           return AlertDialog(
             backgroundColor: Colors.grey.shade900,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20)),
             title: Text('Add Crop',
                 style: GoogleFonts.poppins(
-                    color: Colors.yellow, fontWeight: FontWeight.bold)),
+                    color: Colors.yellow,
+                    fontWeight: FontWeight.bold)),
             content: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -758,17 +757,14 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                     keyboardType: const TextInputType.numberWithOptions(
                         decimal: true),
                   ),
-                  dialogField(
-                      'Image URL (optional)', imageC, Icons.image,
+                  dialogField('Image URL (optional)', imageC, Icons.image,
                       accentColor: Colors.yellow),
-
                   const SizedBox(height: 10),
-
-                  PaymentSelector(
-                    selectedId: selectedPaymentId,
-                    onChanged: (id) =>
-                        setS(() => selectedPaymentId = id),
-                    accountController: accNumberC,
+                  MultiPaymentSelector(
+                    selectedIds: selectedPaymentIds,
+                    onChanged: (ids) =>
+                        setS(() => selectedPaymentIds = ids),
+                    accountControllers: accControllers,
                     accentColor: Colors.yellow,
                   ),
                 ],
@@ -776,7 +772,10 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(ctx),
+                onPressed: () {
+                  for (final c in accControllers.values) c.dispose();
+                  Navigator.pop(ctx);
+                },
                 child: Text('Cancel',
                     style: GoogleFonts.poppins(color: Colors.white60)),
               ),
@@ -791,73 +790,86 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                       priceC.text.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                            content: Text(
-                                'Title, Category, Price required'),
+                            content: Text('Title, Category, Price required'),
                             backgroundColor: Colors.red));
                     return;
                   }
-                  if (selectedPaymentId == null) {
+
+                  if (selectedPaymentIds.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                            content: Text(
-                                'Please select a payment method!'),
-                            backgroundColor: Colors.orange));
-                    return;
-                  }
-                  if (needsAccount &&
-                      accNumberC.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Please enter your account number!'),
+                            content: Text('Kam az kam ek payment method select karo!'),
                             backgroundColor: Colors.orange));
                     return;
                   }
 
+                  for (final id in selectedPaymentIds) {
+                    final m = kPaymentMethods.firstWhere((m) => m.id == id);
+                    if (m.requiresAccount &&
+                        (accControllers[id]?.text.trim().isEmpty ?? true)) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text('${m.name} ka account number enter karo!'),
+                          backgroundColor: Colors.orange));
+                      return;
+                    }
+                  }
+
                   setS(() => saving = true);
                   try {
+                    final paymentMethodsJson = selectedPaymentIds.map((id) {
+                      final m = kPaymentMethods.firstWhere((m) => m.id == id);
+                      return {
+                        'id': m.id,
+                        'name': m.name,
+                        'account': m.requiresAccount
+                            ? (accControllers[id]?.text.trim() ?? '')
+                            : '',
+                      };
+                    }).toList();
+
+                    final firstMethod = kPaymentMethods
+                        .firstWhere((m) => m.id == selectedPaymentIds.first);
+                    final legacyAccount = firstMethod.requiresAccount
+                        ? (accControllers[selectedPaymentIds.first]?.text.trim() ?? '')
+                        : null;
+
                     await supabase.from('products').insert({
                       'title': titleC.text.trim(),
                       'category': categoryC.text.trim(),
                       'price': priceC.text.trim(),
                       'location': locationC.text.trim(),
-                      'image_url':
-                      imageC.text.trim().isEmpty
+                      'image_url': imageC.text.trim().isEmpty
                           ? null
                           : imageC.text.trim(),
                       'seller_type': 'farmer',
                       'seller_name': widget.farmerName,
                       'crop_quantity_kg':
-                      double.tryParse(
-                          quantityKgC.text.trim()) ??
-                          0,
-                      'payment_method':
-                      selectedMethod?.name ?? '',
-                      'payment_account': needsAccount
-                          ? accNumberC.text.trim()
-                          : null,
+                      double.tryParse(quantityKgC.text.trim()) ?? 0,
+                      'payment_methods_json': paymentMethodsJson,
+                      'payment_method': firstMethod.name,
+                      'payment_account': legacyAccount,
                     });
+
+                    for (final c in accControllers.values) c.dispose();
+
                     if (mounted) {
                       Navigator.pop(ctx);
-                      setState(() {});
+                      _reloadCrops();
                       ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                               content: Text('Crop Added! ✅'),
                               backgroundColor: Colors.green));
                     }
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                            content: Text('Error: $e'),
-                            backgroundColor: Colors.red));
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('Error: $e'),
+                        backgroundColor: Colors.red));
                   }
                   setS(() => saving = false);
                 },
                 child: saving
-                    ? const CircularProgressIndicator(
-                    color: Colors.white)
-                    : Text('Add',
-                    style:
-                    GoogleFonts.poppins(color: Colors.white)),
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : Text('Add', style: GoogleFonts.poppins(color: Colors.white)),
               ),
             ],
           );
@@ -866,10 +878,11 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
     );
   }
 
+  // FIX #4: _reloadCrops() instead of setState
   Future<void> _deleteCrop(String id) async {
     try {
       await supabase.from('products').delete().eq('id', id);
-      setState(() {});
+      _reloadCrops();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('Crop Deleted!'),
@@ -882,7 +895,40 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
   }
 }
 
-// ── PRODUCT CARD — with + Add button ─────────────────────────────────────────
+// ── HELPER: dialog text field ─────────────────────────────────────────────────
+Widget dialogField(
+    String label,
+    TextEditingController controller,
+    IconData icon, {
+      Color accentColor = Colors.green,
+      TextInputType keyboardType = TextInputType.text,
+    }) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: accentColor.withValues(alpha: 0.8)),
+        prefixIcon: Icon(icon, color: accentColor, size: 20),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.white24),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: accentColor),
+        ),
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.05),
+      ),
+    ),
+  );
+}
+
+// ── PRODUCT CARD — with all fixes ─────────────────────────────────────────────
 class _ProductCard extends StatefulWidget {
   final Map<String, dynamic> product;
   final VoidCallback onCartUpdate;
@@ -895,14 +941,19 @@ class _ProductCard extends StatefulWidget {
 class _ProductCardState extends State<_ProductCard> {
   final supabase = Supabase.instance.client;
   bool _adding = false;
+  late int _stockVal;
 
-  Future<void> _addToCart() async {
+  @override
+  void initState() {
+    super.initState();
     final stock = widget.product['stock_quantity'];
-    final stockVal = (stock != null && int.tryParse(stock.toString()) != null)
+    _stockVal = (stock != null && int.tryParse(stock.toString()) != null)
         ? int.parse(stock.toString())
         : 0;
+  }
 
-    if (stockVal <= 0) {
+  Future<void> _addToCart() async {
+    if (_stockVal <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content: Text('Item out of stock!'),
@@ -913,15 +964,55 @@ class _ProductCardState extends State<_ProductCard> {
 
     setState(() => _adding = true);
     try {
-      await supabase.from('farmer_cart').insert({
-        'product_id': widget.product['id'],
-        'product_title': widget.product['title'],
-        'product_price': widget.product['price'],
-        'product_image': widget.product['image_url'],
-        'seller_name': widget.product['seller_name'],
-        'seller_type': widget.product['seller_type'],
-        'quantity': 1,
-      });
+      // FIX #2: Re-check live stock from DB before adding
+      final res = await supabase
+          .from('products')
+          .select('stock_quantity')
+          .eq('id', widget.product['id'])
+          .single();
+
+      final liveStock = int.tryParse(res['stock_quantity'].toString()) ?? 0;
+
+      if (liveStock <= 0) {
+        if (mounted) {
+          setState(() {
+            _stockVal = 0;
+            _adding = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Item just went out of stock!'),
+                backgroundColor: Colors.red),
+          );
+        }
+        return;
+      }
+
+      // FIX #3: Check if already in cart — update qty instead of duplicate
+      final existing = await supabase
+          .from('farmer_cart')
+          .select('id, quantity')
+          .eq('product_id', widget.product['id'].toString())
+          .maybeSingle();
+
+      if (existing != null) {
+        final newQty = (existing['quantity'] as int) + 1;
+        await supabase
+            .from('farmer_cart')
+            .update({'quantity': newQty})
+            .eq('id', existing['id']);
+      } else {
+        await supabase.from('farmer_cart').insert({
+          'product_id': widget.product['id'],
+          'product_title': widget.product['title'],
+          'product_price': widget.product['price'],
+          'product_image': widget.product['image_url'],
+          'seller_name': widget.product['seller_name'],
+          'seller_type': widget.product['seller_type'],
+          'quantity': 1,
+        });
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -960,26 +1051,33 @@ class _ProductCardState extends State<_ProductCard> {
         );
       }
     }
-    setState(() => _adding = false);
+    if (mounted) setState(() => _adding = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final stock = widget.product['stock_quantity'];
-    final stockVal = (stock != null &&
-        int.tryParse(stock.toString()) != null &&
-        int.parse(stock.toString()) > 0)
-        ? int.parse(stock.toString())
-        : 0;
-    final bool inStock = stockVal > 0;
-    final String? stockText = inStock ? '$stockVal in stock' : null;
+    final bool inStock = _stockVal > 0;
 
     return GestureDetector(
-      onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (_) =>
-                  ProductDetailScreen(product: widget.product))),
+      onTap: () async {
+        await Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) =>
+                    ProductDetailScreen(product: widget.product)));
+        // Refresh stock after returning from detail screen
+        final res = await supabase
+            .from('products')
+            .select('stock_quantity')
+            .eq('id', widget.product['id'])
+            .maybeSingle();
+        if (res != null && mounted) {
+          setState(() {
+            _stockVal =
+                int.tryParse(res['stock_quantity'].toString()) ?? 0;
+          });
+        }
+      },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
@@ -989,7 +1087,6 @@ class _ProductCardState extends State<_ProductCard> {
         ),
         child: Column(
           children: [
-            // ── Main product row ──
             Row(
               children: [
                 ClipRRect(
@@ -1021,8 +1118,8 @@ class _ProductCardState extends State<_ProductCard> {
                       width: 110,
                       height: 100,
                       color: Colors.grey.shade800,
-                      child: const Icon(Icons.image,
-                          color: Colors.white54)),
+                      child:
+                      const Icon(Icons.image, color: Colors.white54)),
                 ),
                 Expanded(
                   child: Padding(
@@ -1032,12 +1129,10 @@ class _ProductCardState extends State<_ProductCard> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Flexible(
-                                child: Text(
-                                    widget.product['title'] ?? '',
+                                child: Text(widget.product['title'] ?? '',
                                     style: GoogleFonts.poppins(
                                         fontSize: 15,
                                         fontWeight: FontWeight.bold,
@@ -1060,37 +1155,35 @@ class _ProductCardState extends State<_ProductCard> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                  color: Colors.green
-                                      .withValues(alpha: 0.3),
-                                  borderRadius:
-                                  BorderRadius.circular(8)),
-                              child: Text(
-                                  widget.product['category'] ?? '',
+                                  color: Colors.green.withValues(alpha: 0.3),
+                                  borderRadius: BorderRadius.circular(8)),
+                              child: Text(widget.product['category'] ?? '',
                                   style: GoogleFonts.poppins(
                                       fontSize: 11,
                                       color: Colors.greenAccent,
                                       fontWeight: FontWeight.w500)),
                             ),
-                            if (stockText != null) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                    color: Colors.blue
-                                        .withValues(alpha: 0.25),
-                                    borderRadius:
-                                    BorderRadius.circular(8),
-                                    border: Border.all(
-                                        color: Colors.lightBlueAccent
-                                            .withValues(alpha: 0.4))),
-                                child: Text('📦 $stockText',
-                                    style: GoogleFonts.poppins(
-                                        fontSize: 10,
-                                        color: Colors.lightBlueAccent,
-                                        fontWeight: FontWeight.w500)),
-                              ),
-                            ],
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                  color: Colors.blue.withValues(alpha: 0.25),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                      color: Colors.lightBlueAccent
+                                          .withValues(alpha: 0.4))),
+                              child: Text(
+                                  inStock
+                                      ? '📦 $_stockVal in stock'
+                                      : '❌ Out of stock',
+                                  style: GoogleFonts.poppins(
+                                      fontSize: 10,
+                                      color: inStock
+                                          ? Colors.lightBlueAccent
+                                          : Colors.redAccent,
+                                      fontWeight: FontWeight.w500)),
+                            ),
                           ],
                         ),
                       ],
@@ -1099,16 +1192,14 @@ class _ProductCardState extends State<_ProductCard> {
                 ),
               ],
             ),
-
-            // ── + Add to Cart button at bottom ──
             Container(
               decoration: BoxDecoration(
                 border: Border(
-                    top: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
+                    top: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.1))),
               ),
               child: Row(
                 children: [
-                  // Price repeated for quick scan
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
@@ -1116,18 +1207,17 @@ class _ProductCardState extends State<_ProductCard> {
                       child: Text(
                         inStock ? '✅ In Stock' : '❌ Out of Stock',
                         style: GoogleFonts.poppins(
-                          color:
-                          inStock ? Colors.greenAccent : Colors.redAccent,
+                          color: inStock
+                              ? Colors.greenAccent
+                              : Colors.redAccent,
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
                   ),
-
-                  // + Add Button
                   GestureDetector(
-                    onTap: _adding ? null : _addToCart,
+                    onTap: (_adding || !inStock) ? null : _addToCart,
                     child: Container(
                       margin: const EdgeInsets.all(8),
                       padding: const EdgeInsets.symmetric(
@@ -1147,10 +1237,14 @@ class _ProductCardState extends State<_ProductCard> {
                           : Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.add,
-                              color: Colors.white, size: 16),
+                          Icon(
+                            inStock ? Icons.add : Icons.block,
+                            color: Colors.white,
+                            size: 16,
+                          ),
                           const SizedBox(width: 4),
-                          Text('Add',
+                          Text(
+                              inStock ? 'Add' : 'N/A',
                               style: GoogleFonts.poppins(
                                   color: Colors.white,
                                   fontSize: 13,

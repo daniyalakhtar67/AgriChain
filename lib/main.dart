@@ -30,7 +30,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.green,
       ),
-      home: const SplashScreen(), // ← sirf itna
+      home: FarmerDashboard(farmerName: 'Daniyal'),
       routes: {
         '/welcome': (context) => const WelcomeScreen(),
         '/buyerRegister': (context) => const BuyerRegister(),

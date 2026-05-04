@@ -1,6 +1,6 @@
 import 'dart:ui';
 import 'package:argichain/screens/farmer/payment.dart';
-import 'package:argichain/utils/payment_methods.dart'; // ← ADDED
+import 'package:argichain/utils/payment_methods.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -20,13 +20,11 @@ class _CartScreenState extends State<CartScreen> {
   final _nameC    = TextEditingController();
   final _phoneC   = TextEditingController();
   final _addressC = TextEditingController();
-
-  // ── ADDED: payment controllers ──
   final _accNumberC = TextEditingController();
   String? _selectedPaymentId;
 
-  bool _placing   = false;
-  bool _showForm  = false;
+  bool _placing  = false;
+  bool _showForm = false;
 
   @override
   void initState() {
@@ -39,7 +37,7 @@ class _CartScreenState extends State<CartScreen> {
     _nameC.dispose();
     _phoneC.dispose();
     _addressC.dispose();
-    _accNumberC.dispose(); // ← ADDED
+    _accNumberC.dispose();
     super.dispose();
   }
 
@@ -65,7 +63,9 @@ class _CartScreenState extends State<CartScreen> {
       fetchCart();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Item removed!'), backgroundColor: Colors.red));
+            const SnackBar(
+                content: Text('Item removed!'),
+                backgroundColor: Colors.red));
       }
     } catch (e) {
       if (mounted) {
@@ -88,7 +88,6 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Future<void> placeAllOrders() async {
-    // ── UPDATED: validation mein payment bhi check karo ──
     if (_nameC.text.trim().isEmpty ||
         _phoneC.text.trim().isEmpty ||
         _addressC.text.trim().isEmpty) {
@@ -122,26 +121,42 @@ class _CartScreenState extends State<CartScreen> {
 
     try {
       for (final item in cartItems) {
-        final productId = item['product_id']?.toString().trim() ?? '';
+        final productId  = item['product_id']?.toString().trim() ?? '';
         final orderedQty = int.tryParse(item['quantity'].toString()) ?? 1;
 
-        // ── Order insert — payment info bhi save karo ──
+        // ── FIX #5: Duplicate guard — same product ordered in last 30 secs ──
+        final recent = await supabase
+            .from('orders')
+            .select('id')
+            .eq('product_id', productId)
+            .eq('buyer_phone', _phoneC.text.trim())
+            .gte(
+          'created_at',
+          DateTime.now()
+              .subtract(const Duration(seconds: 30))
+              .toIso8601String(),
+        )
+            .maybeSingle();
+
+        if (recent != null) continue; // skip duplicate, move to next item
+
+        // ── Order insert ──
         await supabase.from('orders').insert({
-          'product_id'      : productId,
-          'product_title'   : item['product_title'] ?? '',
-          'product_price'   : item['product_price'] ?? '',
-          'seller_name'     : item['seller_name'] ?? '',
-          'seller_type'     : item['seller_type'] ?? 'shopkeeper',
-          'buyer_name'      : _nameC.text.trim(),
-          'buyer_phone'     : _phoneC.text.trim(),
-          'buyer_address'   : _addressC.text.trim(),
-          'payment_method'  : selectedMethod.name,          // ← ADDED
-          'payment_account' : selectedMethod.requiresAccount // ← ADDED
+          'product_id'     : productId,
+          'product_title'  : item['product_title'] ?? '',
+          'product_price'  : item['product_price'] ?? '',
+          'seller_name'    : item['seller_name'] ?? '',
+          'seller_type'    : item['seller_type'] ?? 'shopkeeper',
+          'buyer_name'     : _nameC.text.trim(),
+          'buyer_phone'    : _phoneC.text.trim(),
+          'buyer_address'  : _addressC.text.trim(),
+          'payment_method' : selectedMethod.name,
+          'payment_account': selectedMethod.requiresAccount
               ? _accNumberC.text.trim()
               : null,
-          'quantity'        : orderedQty,
-          'status'          : 'pending',
-          'created_at'      : DateTime.now().toIso8601String(),
+          'quantity'       : orderedQty,
+          'status'         : 'pending',
+          'created_at'     : DateTime.now().toIso8601String(),
         });
 
         // ── Stock deduct ──
@@ -154,9 +169,9 @@ class _CartScreenState extends State<CartScreen> {
                 .maybeSingle();
 
             if (res != null && res['stock_quantity'] != null) {
-              final currentStock = int.tryParse(res['stock_quantity'].toString()) ?? 0;
+              final currentStock =
+                  int.tryParse(res['stock_quantity'].toString()) ?? 0;
               final newStock = (currentStock - orderedQty).clamp(0, 999999);
-
               await supabase
                   .from('products')
                   .update({'stock_quantity': newStock})
@@ -170,23 +185,26 @@ class _CartScreenState extends State<CartScreen> {
 
       await clearCart();
       setState(() {
-        _placing = false;
-        _showForm = false;
-        _selectedPaymentId = null; // ← reset
-        _accNumberC.clear();       // ← reset
+        _placing           = false;
+        _showForm          = false;
+        _selectedPaymentId = null;
+        _accNumberC.clear();
       });
 
+      // ── FIX #6: Order Confirmation Dialog ──
       if (mounted) {
         showDialog(
           context: context,
           barrierDismissible: false,
           builder: (_) => AlertDialog(
             backgroundColor: Colors.grey.shade900,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.check_circle, color: Colors.green, size: 70),
+                const Icon(Icons.check_circle,
+                    color: Colors.green, size: 70),
                 const SizedBox(height: 16),
                 Text('All Orders Placed!',
                     style: GoogleFonts.poppins(
@@ -194,15 +212,20 @@ class _CartScreenState extends State<CartScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                Text('Sellers will contact you shortly.',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(color: Colors.white60, fontSize: 13)),
+                Text(
+                  'Sellers will contact you shortly.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                      color: Colors.white60, fontSize: 13),
+                ),
                 const SizedBox(height: 20),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green),
                   onPressed: () {
                     int popCount = 0;
-                    Navigator.of(context).popUntil((_) => popCount++ >= 2);
+                    Navigator.of(context)
+                        .popUntil((_) => popCount++ >= 2);
                   },
                   child: Text('Back to Dashboard',
                       style: GoogleFonts.poppins(color: Colors.white)),
@@ -217,7 +240,9 @@ class _CartScreenState extends State<CartScreen> {
       debugPrint('placeAllOrders error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+            SnackBar(
+                content: Text('Error: $e'),
+                backgroundColor: Colors.red));
       }
     }
   }
@@ -230,13 +255,15 @@ class _CartScreenState extends State<CartScreen> {
           SizedBox.expand(
               child: Image.asset('assets/images/DF.jpg', fit: BoxFit.cover)),
           SizedBox.expand(
-              child: Container(color: Colors.black.withValues(alpha: 0.70))),
+              child:
+              Container(color: Colors.black.withValues(alpha: 0.70))),
           SafeArea(
             child: Column(
               children: [
                 // ── AppBar ──
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
                   child: Row(
                     children: [
                       GestureDetector(
@@ -247,7 +274,8 @@ class _CartScreenState extends State<CartScreen> {
                               color: Colors.white.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: Colors.white24)),
-                          child: const Icon(Icons.arrow_back, color: Colors.white),
+                          child: const Icon(Icons.arrow_back,
+                              color: Colors.white),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -299,29 +327,36 @@ class _CartScreenState extends State<CartScreen> {
                 Expanded(
                   child: isLoading
                       ? const Center(
-                      child: CircularProgressIndicator(color: Colors.green))
+                      child: CircularProgressIndicator(
+                          color: Colors.green))
                       : cartItems.isEmpty
                       ? Center(
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisAlignment:
+                      MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.shopping_cart_outlined,
-                            color: Colors.white38, size: 80),
+                        const Icon(
+                            Icons.shopping_cart_outlined,
+                            color: Colors.white38,
+                            size: 80),
                         const SizedBox(height: 16),
                         Text('Cart is empty!',
                             style: GoogleFonts.poppins(
-                                color: Colors.white60, fontSize: 18)),
+                                color: Colors.white60,
+                                fontSize: 18)),
                       ],
                     ),
                   )
                       : SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16),
                     child: Column(
                       children: [
                         // ── Cart Items ──
                         ...cartItems.map((item) => _CartItem(
                           item: item,
-                          onRemove: () => removeFromCart(item['id']),
+                          onRemove: () =>
+                              removeFromCart(item['id']),
                           onQtyChange: (qty) async {
                             await supabase
                                 .from('farmer_cart')
@@ -335,28 +370,37 @@ class _CartScreenState extends State<CartScreen> {
 
                         // ── Total Items ──
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius:
+                          BorderRadius.circular(14),
                           child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                            filter: ImageFilter.blur(
+                                sigmaX: 8, sigmaY: 8),
                             child: Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.10),
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: Colors.white24)),
+                                  color: Colors.white
+                                      .withValues(alpha: 0.10),
+                                  borderRadius:
+                                  BorderRadius.circular(14),
+                                  border: Border.all(
+                                      color: Colors.white24)),
                               child: Row(
                                 mainAxisAlignment:
-                                MainAxisAlignment.spaceBetween,
+                                MainAxisAlignment
+                                    .spaceBetween,
                                 children: [
                                   Text('Total Items:',
                                       style: GoogleFonts.poppins(
                                           color: Colors.white60,
                                           fontSize: 14)),
-                                  Text('${cartItems.length} items',
+                                  Text(
+                                      '${cartItems.length} items',
                                       style: GoogleFonts.poppins(
-                                          color: Colors.greenAccent,
+                                          color:
+                                          Colors.greenAccent,
                                           fontSize: 16,
-                                          fontWeight: FontWeight.bold)),
+                                          fontWeight:
+                                          FontWeight.bold)),
                                 ],
                               ),
                             ),
@@ -368,59 +412,88 @@ class _CartScreenState extends State<CartScreen> {
                         // ── Checkout Form ──
                         if (_showForm) ...[
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius:
+                            BorderRadius.circular(16),
                             child: BackdropFilter(
-                              filter:
-                              ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                              filter: ImageFilter.blur(
+                                  sigmaX: 8, sigmaY: 8),
                               child: Container(
-                                padding: const EdgeInsets.all(16),
+                                padding:
+                                const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
                                     color: Colors.white
                                         .withValues(alpha: 0.10),
                                     borderRadius:
-                                    BorderRadius.circular(16),
-                                    border:
-                                    Border.all(color: Colors.white24)),
+                                    BorderRadius.circular(
+                                        16),
+                                    border: Border.all(
+                                        color: Colors.white24)),
                                 child: Column(
                                   crossAxisAlignment:
                                   CrossAxisAlignment.start,
                                   children: [
                                     Text('Your Details',
-                                        style: GoogleFonts.poppins(
-                                            color: Colors.yellow,
+                                        style:
+                                        GoogleFonts.poppins(
+                                            color: Colors
+                                                .yellow,
                                             fontSize: 16,
-                                            fontWeight: FontWeight.bold)),
+                                            fontWeight:
+                                            FontWeight
+                                                .bold)),
                                     const SizedBox(height: 12),
-                                    _formField('Your Name', _nameC,
+                                    _formField('Your Name',
+                                        _nameC,
                                         Icons.person_outline),
                                     const SizedBox(height: 10),
                                     _formField(
                                         'Phone Number',
                                         _phoneC,
                                         Icons.phone_outlined,
-                                        type: TextInputType.phone),
+                                        type: TextInputType
+                                            .phone),
                                     const SizedBox(height: 10),
                                     _formField(
                                         'Delivery Address',
                                         _addressC,
-                                        Icons.location_on_outlined,
+                                        Icons
+                                            .location_on_outlined,
                                         maxLines: 2),
 
                                     const SizedBox(height: 16),
-                                    const Divider(color: Colors.white24),
+                                    const Divider(
+                                        color: Colors.white24),
                                     const SizedBox(height: 12),
 
-                                    // ── ADDED: Payment Selector ──
-                                    StatefulBuilder(
-                                      builder: (ctx, setS) => PaymentSelector(
-                                        selectedId: _selectedPaymentId,
-                                        onChanged: (id) {
-                                          setState(() =>
-                                          _selectedPaymentId = id);
-                                          setS(() {});
-                                        },
-                                        accountController: _accNumberC,
-                                        accentColor: Colors.greenAccent,
+                                    // FIX #7: PaymentSelector
+                                    // directly uses setState — no
+                                    // StatefulBuilder needed
+                                    Container(
+                                      padding:
+                                      const EdgeInsets.all(
+                                          16),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white
+                                            .withValues(
+                                            alpha: 0.07),
+                                        borderRadius:
+                                        BorderRadius.circular(
+                                            16),
+                                        border: Border.all(
+                                            color:
+                                            Colors.white24),
+                                      ),
+                                      child: PaymentSelector(
+                                        selectedId:
+                                        _selectedPaymentId,
+                                        onChanged: (id) =>
+                                            setState(() =>
+                                            _selectedPaymentId =
+                                                id),
+                                        accountController:
+                                        _accNumberC,
+                                        accentColor:
+                                        Colors.greenAccent,
                                       ),
                                     ),
                                   ],
@@ -440,12 +513,14 @@ class _CartScreenState extends State<CartScreen> {
                                 backgroundColor: Colors.green,
                                 shape: RoundedRectangleBorder(
                                     borderRadius:
-                                    BorderRadius.circular(16))),
+                                    BorderRadius.circular(
+                                        16))),
                             onPressed: _placing
                                 ? null
                                 : () {
                               if (!_showForm) {
-                                setState(() => _showForm = true);
+                                setState(() =>
+                                _showForm = true);
                               } else {
                                 placeAllOrders();
                               }
@@ -454,13 +529,15 @@ class _CartScreenState extends State<CartScreen> {
                                 ? const SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(
+                                child:
+                                CircularProgressIndicator(
                                     color: Colors.white,
                                     strokeWidth: 2))
                                 : Icon(
                                 _showForm
                                     ? Icons.check
-                                    : Icons.shopping_bag_outlined,
+                                    : Icons
+                                    .shopping_bag_outlined,
                                 color: Colors.white),
                             label: Text(
                               _placing
@@ -488,8 +565,13 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _formField(String label, TextEditingController c, IconData icon,
-      {TextInputType type = TextInputType.text, int maxLines = 1}) {
+  Widget _formField(
+      String label,
+      TextEditingController c,
+      IconData icon, {
+        TextInputType type = TextInputType.text,
+        int maxLines = 1,
+      }) {
     return TextField(
       controller: c,
       keyboardType: type,
@@ -512,13 +594,15 @@ class _CartScreenState extends State<CartScreen> {
   }
 }
 
-// ── Cart Item Widget (unchanged) ─────────────────────────────────────────────
+// ── Cart Item Widget ──────────────────────────────────────────────────────────
 class _CartItem extends StatelessWidget {
   final Map<String, dynamic> item;
   final VoidCallback onRemove;
   final Function(int) onQtyChange;
   const _CartItem(
-      {required this.item, required this.onRemove, required this.onQtyChange});
+      {required this.item,
+        required this.onRemove,
+        required this.onQtyChange});
 
   @override
   Widget build(BuildContext context) {
@@ -533,7 +617,8 @@ class _CartItem extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16), bottomLeft: Radius.circular(16)),
+                topLeft: Radius.circular(16),
+                bottomLeft: Radius.circular(16)),
             child: item['product_image'] != null
                 ? CachedNetworkImage(
                 imageUrl: item['product_image'],
@@ -550,11 +635,13 @@ class _CartItem extends StatelessWidget {
                 width: 90,
                 height: 90,
                 color: Colors.grey.shade800,
-                child: const Icon(Icons.image, color: Colors.white54)),
+                child:
+                const Icon(Icons.image, color: Colors.white54)),
           ),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -579,13 +666,15 @@ class _CartItem extends StatelessWidget {
                         child: Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.1),
+                                color:
+                                Colors.white.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6)),
                             child: const Icon(Icons.remove,
                                 color: Colors.white, size: 16)),
                       ),
                       Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10),
                           child: Text('$qty',
                               style: GoogleFonts.poppins(
                                   color: Colors.white,
@@ -595,7 +684,8 @@ class _CartItem extends StatelessWidget {
                         child: Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
-                                color: Colors.green.withValues(alpha: 0.3),
+                                color:
+                                Colors.green.withValues(alpha: 0.3),
                                 borderRadius: BorderRadius.circular(6)),
                             child: const Icon(Icons.add,
                                 color: Colors.greenAccent, size: 16)),

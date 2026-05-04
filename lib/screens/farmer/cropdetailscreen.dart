@@ -167,31 +167,6 @@ class _CropDetailScreenState extends State<CropDetailScreen> {
                                 color: Colors.white),
                             overflow: TextOverflow.ellipsis),
                       ),
-                      // ── Set Stock button top right ──
-                      GestureDetector(
-                        onTap: _showCustomAmountDialog,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.yellow.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.yellow),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.edit,
-                                  color: Colors.yellow, size: 14),
-                              const SizedBox(width: 6),
-                              Text('Set Stock',
-                                  style: GoogleFonts.poppins(
-                                      color: Colors.yellow,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600)),
-                            ],
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
