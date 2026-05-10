@@ -35,6 +35,9 @@ class _BuyerRegisterState extends State<BuyerRegister>
   final _phoneController    = TextEditingController();
   final _addressController  = TextEditingController();
   final _passwordController = TextEditingController();
+  final _landController = TextEditingController();
+  final _farmLocController = TextEditingController();
+  final _homeLocController = TextEditingController();
 
   bool _isLoading = false;
   late AnimationController _animCtrl;
@@ -62,6 +65,9 @@ class _BuyerRegisterState extends State<BuyerRegister>
     _phoneController.dispose();
     _addressController.dispose();
     _passwordController.dispose();
+    _landController.dispose();
+    _farmLocController.dispose();
+    _homeLocController.dispose();
     super.dispose();
   }
 
@@ -69,35 +75,60 @@ class _BuyerRegisterState extends State<BuyerRegister>
     final name    = _nameController.text.trim();
     final cnic    = _cnicController.text.trim();
     final phone   = _phoneController.text.trim();
-    final address = _addressController.text.trim();
+    final address = _addressController.text.trim(); // ✅ use this
     final pass    = _passwordController.text.trim();
 
+    // ✅ Only validate fields that actually exist in the form
     if (name.isEmpty || cnic.isEmpty || phone.isEmpty || address.isEmpty || pass.isEmpty) {
-      _showSnack('Please fill all required fields', isError: true); return;
+      _showSnack('All fields are required', isError: true); return;
     }
     if (cnic.length != 15) { _showSnack('Enter complete 13-digit CNIC', isError: true); return; }
-    if (phone.length != 11) { _showSnack('Phone number must be exactly 11 digits', isError: true); return; }
-    if (pass.length < 6)   { _showSnack('Password must be at least 6 characters', isError: true); return; }
+    if (phone.length != 11) { _showSnack('Phone must be 11 digits', isError: true); return; }
+    if (pass.length < 6)   { _showSnack('Password must be 6+ characters', isError: true); return; }
 
     setState(() => _isLoading = true);
+
     try {
-      final existing = await Supabase.instance.client.from('buyers').select().eq('cnic', cnic);
+      final existing = await Supabase.instance.client
+          .from('users')
+          .select('user_id')
+          .eq('cnic', cnic);
+
       if (existing.isNotEmpty) {
-        _showSnack('CNIC already exists!', isError: true);
-        setState(() => _isLoading = false); return;
+        _showSnack('This CNIC is already registered!', isError: true);
+        setState(() => _isLoading = false);
+        return;
       }
+
+      final userResponse = await Supabase.instance.client
+          .from('users')
+          .insert({
+        'name'          : name,
+        'cnic'          : cnic,
+        'contact_number': phone,
+        'password'      : pass,
+        'location'      : address, // ✅ correct field
+        'status'        : 'active',
+        'is_verified'   : false,
+      })
+          .select('user_id')
+          .single();
+
+      final userId = userResponse['user_id'];
+
+      // ✅ Correct table
       await Supabase.instance.client.from('buyers').insert({
-        'full_name': name,
-        'cnic'     : cnic,
-        'phone'    : phone,
-        'address'  : address,
-        'password' : pass,
+        'user_id': userId,
+        'license': null,
       });
-      _showSnack('Buyer Registered Successfully!');
+
+      _showSnack('Registration Successful!');
       await Future.delayed(const Duration(seconds: 1));
       if (mounted) Navigator.pop(context);
+
     } catch (e) {
-      _showSnack('Registration failed.', isError: true);
+      _showSnack('Something went wrong. Try again.', isError: true);
+      debugPrint('Register error: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

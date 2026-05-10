@@ -86,10 +86,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 style: GoogleFonts.poppins(color: Colors.white60)),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            style:
+            ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Logout',
-                style: GoogleFonts.poppins(color: Colors.white)),
+            child:
+            Text('Logout', style: GoogleFonts.poppins(color: Colors.white)),
           ),
         ],
       ),
@@ -155,14 +156,27 @@ class _UsersTabState extends State<_UsersTab>
   Future<void> _fetchAllUsers() async {
     setState(() => isLoading = true);
     try {
-      final b = await supabase.from('buyers').select().order('created_at', ascending: false);
-      final f = await supabase.from('farmers').select().order('created_at', ascending: false);
-      final s = await supabase.from('shopkeepers').select().order('created_at', ascending: false);
+      final b = await supabase.from('buyers').select(
+          'user_id, license, users(user_id, name, cnic, contact_number, location, is_verified, status, created_at)');
+      final f = await supabase.from('farmers').select(
+          'user_id, land_area, farmer_card, users(user_id, name, cnic, contact_number, location, is_verified, status, created_at)');
+      final s = await supabase.from('shopkeepers').select(
+          'user_id, shop_name, shop_address, opening_hours, rating, users(user_id, name, cnic, contact_number, location, is_verified, status, created_at)');
+
+      List<Map<String, dynamic>> flatten(List list) {
+        return list.map((e) {
+          final map = Map<String, dynamic>.from(e);
+          final userFields = Map<String, dynamic>.from(map['users'] ?? {});
+          map.remove('users');
+          return {...userFields, ...map};
+        }).toList();
+      }
+
       setState(() {
-        buyers = List<Map<String, dynamic>>.from(b);
-        farmers = List<Map<String, dynamic>>.from(f);
-        shopkeepers = List<Map<String, dynamic>>.from(s);
-        isLoading = false;
+        buyers      = flatten(b);
+        farmers     = flatten(f);
+        shopkeepers = flatten(s);
+        isLoading   = false;
       });
     } catch (e) {
       setState(() => isLoading = false);
@@ -175,9 +189,9 @@ class _UsersTabState extends State<_UsersTab>
     final q = _search.toLowerCase();
     return list
         .where((u) =>
-    (u['full_name'] ?? '').toString().toLowerCase().contains(q) ||
+    (u['name'] ?? '').toString().toLowerCase().contains(q) ||
         (u['cnic'] ?? '').toString().contains(q) ||
-        (u['phone'] ?? '').toString().contains(q))
+        (u['contact_number'] ?? '').toString().contains(q))
         .toList();
   }
 
@@ -186,24 +200,28 @@ class _UsersTabState extends State<_UsersTab>
         .showSnackBar(SnackBar(content: Text(msg), backgroundColor: color));
   }
 
-  Future<void> _toggleVerify(String table, String id, bool current) async {
+  Future<void> _toggleVerify(String id, bool current) async {
     try {
-      await supabase.from(table).update({'is_verified': !current}).eq('id', id);
+      await supabase
+          .from('users')
+          .update({'is_verified': !current}).eq('user_id', id);
       _fetchAllUsers();
       _showSnack(
-          !current ? '✅ User Verified!' : '❌ Verification Removed',
-          !current ? Colors.green : Colors.orange);
+        !current ? '✅ User Verified!' : '❌ Verification Removed',
+        !current ? Colors.green : Colors.orange,
+      );
     } catch (e) {
-      _showSnack('Column missing — run the SQL in your Supabase editor.', Colors.red);
+      _showSnack('Error: $e', Colors.red);
     }
   }
 
-  Future<void> _deleteUser(String table, String id, String name) async {
+  Future<void> _deleteUser(String id, String name) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: Colors.grey.shade900,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        shape:
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: Text('Delete User?',
             style: GoogleFonts.poppins(
                 color: Colors.white, fontWeight: FontWeight.bold)),
@@ -217,14 +235,14 @@ class _UsersTabState extends State<_UsersTab>
           ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
               onPressed: () => Navigator.pop(context, true),
-              child:
-              Text('Delete', style: GoogleFonts.poppins(color: Colors.white))),
+              child: Text('Delete',
+                  style: GoogleFonts.poppins(color: Colors.white))),
         ],
       ),
     );
     if (confirm == true) {
       try {
-        await supabase.from(table).delete().eq('id', id);
+        await supabase.from('users').delete().eq('user_id', id);
         _fetchAllUsers();
         _showSnack('User "$name" deleted.', Colors.red);
       } catch (e) {
@@ -233,7 +251,8 @@ class _UsersTabState extends State<_UsersTab>
     }
   }
 
-  Future<void> _viewUserDetail(Map<String, dynamic> user, String table) async {
+  Future<void> _viewUserDetail(
+      Map<String, dynamic> user, String table) async {
     await showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -261,7 +280,8 @@ class _UsersTabState extends State<_UsersTab>
                       border: Border.all(
                           color: Colors.redAccent.withValues(alpha: 0.5)),
                     ),
-                    child: const Icon(Icons.people, color: Colors.redAccent, size: 20),
+                    child: const Icon(Icons.people,
+                        color: Colors.redAccent, size: 20),
                   ),
                   const SizedBox(width: 12),
                   RichText(
@@ -269,12 +289,14 @@ class _UsersTabState extends State<_UsersTab>
                       TextSpan(
                           text: 'User ',
                           style: GoogleFonts.poppins(
-                              fontSize: 20, fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
                               color: Colors.white)),
                       TextSpan(
                           text: 'Management',
                           style: GoogleFonts.poppins(
-                              fontSize: 20, fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
                               color: Colors.redAccent)),
                     ]),
                   ),
@@ -288,7 +310,8 @@ class _UsersTabState extends State<_UsersTab>
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: Colors.white24),
                       ),
-                      child: const Icon(Icons.refresh, color: Colors.white, size: 20),
+                      child: const Icon(Icons.refresh,
+                          color: Colors.white, size: 20),
                     ),
                   ),
                 ],
@@ -305,7 +328,8 @@ class _UsersTabState extends State<_UsersTab>
                     const SizedBox(width: 8),
                     _miniStat('Farmers', farmers.length, Colors.greenAccent),
                     const SizedBox(width: 8),
-                    _miniStat('Shops', shopkeepers.length, Colors.orangeAccent),
+                    _miniStat(
+                        'Shops', shopkeepers.length, Colors.orangeAccent),
                   ],
                 ),
               ),
@@ -315,11 +339,12 @@ class _UsersTabState extends State<_UsersTab>
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: TextField(
                 onChanged: (v) => setState(() => _search = v),
-                style: const TextStyle(color: Colors.white, fontSize: 13),
+                style:
+                const TextStyle(color: Colors.white, fontSize: 13),
                 decoration: InputDecoration(
                   hintText: 'Search by name, CNIC or phone…',
-                  hintStyle: GoogleFonts.poppins(
-                      color: Colors.white38, fontSize: 13),
+                  hintStyle:
+                  GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
                   prefixIcon: const Icon(Icons.search,
                       color: Colors.white38, size: 18),
                   filled: true,
@@ -353,8 +378,8 @@ class _UsersTabState extends State<_UsersTab>
                 ),
                 labelColor: Colors.redAccent,
                 unselectedLabelColor: Colors.white60,
-                labelStyle:
-                GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 11),
+                labelStyle: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w600, fontSize: 11),
                 unselectedLabelStyle: GoogleFonts.poppins(fontSize: 11),
                 dividerColor: Colors.transparent,
                 tabs: [
@@ -370,7 +395,8 @@ class _UsersTabState extends State<_UsersTab>
             Expanded(
               child: isLoading
                   ? const Center(
-                  child: CircularProgressIndicator(color: Colors.redAccent))
+                  child: CircularProgressIndicator(
+                      color: Colors.redAccent))
                   : TabBarView(
                 controller: _tabCtrl,
                 children: [
@@ -398,9 +424,12 @@ class _UsersTabState extends State<_UsersTab>
         child: Column(children: [
           Text('$count',
               style: GoogleFonts.poppins(
-                  color: color, fontWeight: FontWeight.bold, fontSize: 18)),
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18)),
           Text(label,
-              style: GoogleFonts.poppins(color: Colors.white60, fontSize: 11)),
+              style:
+              GoogleFonts.poppins(color: Colors.white60, fontSize: 11)),
         ]),
       ),
     );
@@ -409,11 +438,13 @@ class _UsersTabState extends State<_UsersTab>
   Widget _userList(List<Map<String, dynamic>> users, String table) {
     if (users.isEmpty) {
       return Center(
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        child:
+        Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           const Icon(Icons.people_outline, color: Colors.white24, size: 70),
           const SizedBox(height: 12),
           Text('No users found',
-              style: GoogleFonts.poppins(color: Colors.white54, fontSize: 15)),
+              style:
+              GoogleFonts.poppins(color: Colors.white54, fontSize: 15)),
         ]),
       );
     }
@@ -424,22 +455,22 @@ class _UsersTabState extends State<_UsersTab>
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: users.length,
         itemBuilder: (context, i) {
-          final user = users[i];
+          final user       = users[i];
           final isVerified = user['is_verified'] == true;
-          final name = user['full_name'] ?? 'Unknown';
-          final cnic = user['cnic'] ?? 'N/A';
-          final phone = user['phone'] ?? 'N/A';
-          final joined = user['created_at'] != null
+          final name       = user['name']           ?? 'Unknown';
+          final cnic       = user['cnic']           ?? 'N/A';
+          final phone      = user['contact_number'] ?? 'N/A';
+          final joined     = user['created_at'] != null
               ? (user['created_at'] as String).substring(0, 10)
               : 'N/A';
 
           String extra = '';
           if (table == 'farmers') {
-            extra = user['farm_location'] ?? user['home_location'] ?? '';
+            extra = user['land_area'] ?? '';
           } else if (table == 'shopkeepers') {
             extra = user['shop_name'] ?? '';
           } else {
-            extra = user['address'] ?? '';
+            extra = user['location'] ?? '';
           }
 
           return GestureDetector(
@@ -481,7 +512,9 @@ class _UsersTabState extends State<_UsersTab>
                                 : table == 'farmers'
                                 ? Icons.agriculture_outlined
                                 : Icons.store_outlined,
-                            color: isVerified ? Colors.greenAccent : Colors.white60,
+                            color: isVerified
+                                ? Colors.greenAccent
+                                : Colors.white60,
                             size: 22,
                           ),
                         ),
@@ -504,8 +537,10 @@ class _UsersTabState extends State<_UsersTab>
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: Colors.green.withValues(alpha: 0.2),
-                                      borderRadius: BorderRadius.circular(8),
+                                      color: Colors.green
+                                          .withValues(alpha: 0.2),
+                                      borderRadius:
+                                      BorderRadius.circular(8),
                                       border: Border.all(
                                           color: Colors.greenAccent
                                               .withValues(alpha: 0.6)),
@@ -520,9 +555,11 @@ class _UsersTabState extends State<_UsersTab>
                               ]),
                               const SizedBox(height: 3),
                               _infoRow(Icons.badge_outlined, 'CNIC: $cnic'),
-                              _infoRow(Icons.phone_outlined, 'Phone: $phone'),
+                              _infoRow(
+                                  Icons.phone_outlined, 'Phone: $phone'),
                               if (extra.isNotEmpty)
-                                _infoRow(Icons.location_on_outlined, extra),
+                                _infoRow(
+                                    Icons.location_on_outlined, extra),
                               _infoRow(Icons.calendar_today_outlined,
                                   'Joined: $joined'),
                             ],
@@ -539,13 +576,16 @@ class _UsersTabState extends State<_UsersTab>
                     decoration: BoxDecoration(
                         border: Border(
                             top: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.08)))),
+                                color:
+                                Colors.white.withValues(alpha: 0.08)))),
                     child: Row(children: [
                       Expanded(
                         child: GestureDetector(
-                          onTap: () => _toggleVerify(table, user['id'], isVerified),
+                          onTap: () => _toggleVerify(
+                              user['user_id'], isVerified),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            padding:
+                            const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
                               color: isVerified
                                   ? Colors.orange.withValues(alpha: 0.12)
@@ -565,7 +605,8 @@ class _UsersTabState extends State<_UsersTab>
                                         : Colors.greenAccent,
                                     size: 16),
                                 const SizedBox(width: 6),
-                                Text(isVerified ? 'Unverify' : 'Verify',
+                                Text(
+                                    isVerified ? 'Unverify' : 'Verify',
                                     style: GoogleFonts.poppins(
                                         color: isVerified
                                             ? Colors.orangeAccent
@@ -583,9 +624,11 @@ class _UsersTabState extends State<_UsersTab>
                           color: Colors.white.withValues(alpha: 0.08)),
                       Expanded(
                         child: GestureDetector(
-                          onTap: () => _deleteUser(table, user['id'], name),
+                          onTap: () =>
+                              _deleteUser(user['user_id'], name),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            padding:
+                            const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
                               color: Colors.red.withValues(alpha: 0.10),
                               borderRadius: const BorderRadius.only(
@@ -626,7 +669,8 @@ class _UsersTabState extends State<_UsersTab>
         const SizedBox(width: 4),
         Flexible(
           child: Text(text,
-              style: GoogleFonts.poppins(color: Colors.white60, fontSize: 11)),
+              style: GoogleFonts.poppins(
+                  color: Colors.white60, fontSize: 11)),
         ),
       ]),
     );
@@ -651,7 +695,8 @@ class _UserDetailSheet extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.grey.shade900,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius:
+        const BorderRadius.vertical(top: Radius.circular(24)),
         border: Border.all(color: Colors.white12),
       ),
       padding: const EdgeInsets.all(24),
@@ -661,21 +706,24 @@ class _UserDetailSheet extends StatelessWidget {
         children: [
           Center(
             child: Container(
-                width: 40, height: 4,
+                width: 40,
+                height: 4,
                 decoration: BoxDecoration(
                     color: Colors.white24,
                     borderRadius: BorderRadius.circular(2))),
           ),
           const SizedBox(height: 16),
-          Text(user['full_name'] ?? 'User Details',
+          Text(user['name'] ?? 'User Details',
               style: GoogleFonts.poppins(
-                  color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold)),
           Text(table.toUpperCase(),
-              style: GoogleFonts.poppins(
-                  color: Colors.redAccent, fontSize: 11)),
+              style:
+              GoogleFonts.poppins(color: Colors.redAccent, fontSize: 11)),
           const SizedBox(height: 16),
           ...fields.entries
-              .where((e) => e.key != 'id' && e.key != 'full_name')
+              .where((e) => e.key != 'user_id' && e.key != 'name')
               .map((e) => Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Row(
@@ -717,7 +765,7 @@ class _StatsTabState extends State<_StatsTab> {
 
   int totalBuyers = 0, totalFarmers = 0, totalShopkeepers = 0;
   int totalProducts = 0, totalOrders = 0, pendingOrders = 0, doneOrders = 0;
-  int verifiedBuyers = 0, verifiedFarmers = 0, verifiedShops = 0;
+  int verifiedUsers = 0;
   bool isLoading = true;
 
   @override
@@ -729,29 +777,43 @@ class _StatsTabState extends State<_StatsTab> {
   Future<void> _fetchStats() async {
     setState(() => isLoading = true);
     try {
-      final b  = await supabase.from('buyers').select('id, is_verified');
-      final f  = await supabase.from('farmers').select('id, is_verified');
-      final s  = await supabase.from('shopkeepers').select('id, is_verified');
-      final p  = await supabase.from('products').select('id');
-      final o  = await supabase.from('orders').select('id, status');
+      // ── Use correct tables & columns ──────────────────────────
+      final b = await supabase
+          .from('buyers')
+          .select('user_id');
+      final f = await supabase
+          .from('farmers')
+          .select('user_id');
+      final s = await supabase
+          .from('shopkeepers')
+          .select('user_id');
+      final p = await supabase
+          .from('products')
+          .select('item_id');
+      final o = await supabase
+          .from('orders')
+          .select('order_id, status');
+      // Verified users count from users table
+      final v = await supabase
+          .from('users')
+          .select('user_id')
+          .eq('is_verified', true);
 
-      final buyers       = List<Map<String, dynamic>>.from(b);
-      final farmers      = List<Map<String, dynamic>>.from(f);
-      final shops        = List<Map<String, dynamic>>.from(s);
-      final orders       = List<Map<String, dynamic>>.from(o);
+      final orders = List<Map<String, dynamic>>.from(o);
 
       setState(() {
-        totalBuyers      = buyers.length;
-        totalFarmers     = farmers.length;
-        totalShopkeepers = shops.length;
+        totalBuyers      = (b as List).length;
+        totalFarmers     = (f as List).length;
+        totalShopkeepers = (s as List).length;
         totalProducts    = (p as List).length;
         totalOrders      = orders.length;
-        pendingOrders    = orders.where((x) => x['status'] == 'pending').length;
-        doneOrders       = orders.where((x) => x['status'] == 'done').length;
-        verifiedBuyers   = buyers.where((x) => x['is_verified'] == true).length;
-        verifiedFarmers  = farmers.where((x) => x['is_verified'] == true).length;
-        verifiedShops    = shops.where((x) => x['is_verified'] == true).length;
-        isLoading = false;
+        // DB status values: 'placed','processing','shipped','delivered','cancelled'
+        pendingOrders    = orders.where((x) =>
+        x['status'] == 'placed' || x['status'] == 'processing').length;
+        doneOrders       = orders.where((x) =>
+        x['status'] == 'delivered').length;
+        verifiedUsers    = (v as List).length;
+        isLoading        = false;
       });
     } catch (e) {
       setState(() => isLoading = false);
@@ -785,12 +847,14 @@ class _StatsTabState extends State<_StatsTab> {
                       TextSpan(
                           text: 'App ',
                           style: GoogleFonts.poppins(
-                              fontSize: 20, fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
                               color: Colors.white)),
                       TextSpan(
                           text: 'Statistics',
                           style: GoogleFonts.poppins(
-                              fontSize: 20, fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
                               color: Colors.redAccent)),
                     ]),
                   ),
@@ -814,7 +878,8 @@ class _StatsTabState extends State<_StatsTab> {
             Expanded(
               child: isLoading
                   ? const Center(
-                  child: CircularProgressIndicator(color: Colors.redAccent))
+                  child: CircularProgressIndicator(
+                      color: Colors.redAccent))
                   : SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -824,16 +889,20 @@ class _StatsTabState extends State<_StatsTab> {
                     _bigStatCard(
                       icon: Icons.groups,
                       label: 'Total Registered Users',
-                      value: totalBuyers + totalFarmers + totalShopkeepers,
+                      value: totalBuyers +
+                          totalFarmers +
+                          totalShopkeepers,
                       color: Colors.purpleAccent,
                     ),
                     const SizedBox(height: 12),
                     Row(children: [
                       _statCard('Buyers', totalBuyers,
-                          Icons.shopping_basket_outlined, Colors.blueAccent),
+                          Icons.shopping_basket_outlined,
+                          Colors.blueAccent),
                       const SizedBox(width: 10),
                       _statCard('Farmers', totalFarmers,
-                          Icons.agriculture_outlined, Colors.greenAccent),
+                          Icons.agriculture_outlined,
+                          Colors.greenAccent),
                       const SizedBox(width: 10),
                       _statCard('Shops', totalShopkeepers,
                           Icons.store_outlined, Colors.orangeAccent),
@@ -842,34 +911,33 @@ class _StatsTabState extends State<_StatsTab> {
                     const SizedBox(height: 20),
                     _sectionTitle('✅ Verified Users'),
                     const SizedBox(height: 10),
-                    Row(children: [
-                      _statCard('Buyers', verifiedBuyers,
-                          Icons.verified_outlined, Colors.blueAccent),
-                      const SizedBox(width: 10),
-                      _statCard('Farmers', verifiedFarmers,
-                          Icons.verified_outlined, Colors.greenAccent),
-                      const SizedBox(width: 10),
-                      _statCard('Shops', verifiedShops,
-                          Icons.verified_outlined, Colors.orangeAccent),
-                    ]),
+                    _bigStatCard(
+                      icon: Icons.verified_user,
+                      label: 'Total Verified Users',
+                      value: verifiedUsers,
+                      color: Colors.greenAccent,
+                    ),
 
                     const SizedBox(height: 20),
                     _sectionTitle('📦 Products & Orders'),
                     const SizedBox(height: 10),
                     Row(children: [
                       _statCard('Products', totalProducts,
-                          Icons.inventory_2_outlined, Colors.tealAccent),
+                          Icons.inventory_2_outlined,
+                          Colors.tealAccent),
                       const SizedBox(width: 10),
                       _statCard('Total Orders', totalOrders,
-                          Icons.receipt_long_outlined, Colors.yellowAccent),
+                          Icons.receipt_long_outlined,
+                          Colors.yellowAccent),
                     ]),
                     const SizedBox(height: 10),
                     Row(children: [
                       _statCard('Pending', pendingOrders,
                           Icons.hourglass_empty, Colors.orange),
                       const SizedBox(width: 10),
-                      _statCard('Completed', doneOrders,
-                          Icons.check_circle_outline, Colors.greenAccent),
+                      _statCard('Delivered', doneOrders,
+                          Icons.check_circle_outline,
+                          Colors.greenAccent),
                     ]),
                     const SizedBox(height: 30),
                   ],
@@ -886,10 +954,13 @@ class _StatsTabState extends State<_StatsTab> {
     alignment: Alignment.centerLeft,
     child: Text(t,
         style: GoogleFonts.poppins(
-            color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
+            color: Colors.white70,
+            fontSize: 13,
+            fontWeight: FontWeight.w600)),
   );
 
-  Widget _statCard(String label, int count, IconData icon, Color color) =>
+  Widget _statCard(
+      String label, int count, IconData icon, Color color) =>
       Expanded(
         child: ClipRRect(
           borderRadius: BorderRadius.circular(14),
@@ -900,14 +971,17 @@ class _StatsTabState extends State<_StatsTab> {
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: color.withValues(alpha: 0.4)),
+                border:
+                Border.all(color: color.withValues(alpha: 0.4)),
               ),
               child: Column(children: [
                 Icon(icon, color: color, size: 24),
                 const SizedBox(height: 6),
                 Text('$count',
                     style: GoogleFonts.poppins(
-                        color: color, fontSize: 20, fontWeight: FontWeight.bold)),
+                        color: color,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold)),
                 const SizedBox(height: 2),
                 Text(label,
                     textAlign: TextAlign.center,
@@ -946,14 +1020,18 @@ class _StatsTabState extends State<_StatsTab> {
                 child: Icon(icon, color: color, size: 28),
               ),
               const SizedBox(width: 16),
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(label,
-                    style: GoogleFonts.poppins(
-                        color: Colors.white60, fontSize: 12)),
-                Text('$value',
-                    style: GoogleFonts.poppins(
-                        color: color, fontSize: 26, fontWeight: FontWeight.bold)),
-              ]),
+              Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label,
+                        style: GoogleFonts.poppins(
+                            color: Colors.white60, fontSize: 12)),
+                    Text('$value',
+                        style: GoogleFonts.poppins(
+                            color: color,
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold)),
+                  ]),
             ]),
           ),
         ),
@@ -989,7 +1067,7 @@ class _AdminsTabState extends State<_AdminsTab> {
           .select()
           .order('created_at', ascending: true);
       setState(() {
-        admins = List<Map<String, dynamic>>.from(res);
+        admins    = List<Map<String, dynamic>>.from(res);
         isLoading = false;
       });
     } catch (e) {
@@ -997,15 +1075,20 @@ class _AdminsTabState extends State<_AdminsTab> {
     }
   }
 
-  Future<void> _toggleActive(String id, bool current) async {
-    // Prevent deactivating self
-    if (id == widget.adminData['id'] && current) {
+  // ── FIX: use 'admin_id' (PK) and 'status' column ─────────────
+  Future<void> _toggleActive(String adminId, bool currentlyActive) async {
+    // Prevent deactivating yourself
+    if (adminId == widget.adminData['admin_id'] && currentlyActive) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('You cannot deactivate your own account.'),
           backgroundColor: Colors.orange));
       return;
     }
-    await supabase.from('admins').update({'is_active': !current}).eq('id', id);
+    final newStatus = currentlyActive ? 'inactive' : 'active';
+    await supabase
+        .from('admins')
+        .update({'status': newStatus})
+        .eq('admin_id', adminId);
     _fetchAdmins();
   }
 
@@ -1017,15 +1100,15 @@ class _AdminsTabState extends State<_AdminsTab> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
           backgroundColor: Colors.grey.shade900,
-          shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18)),
           title: Text('Change Password',
               style: GoogleFonts.poppins(
                   color: Colors.white, fontWeight: FontWeight.bold)),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
             Text('For: ${admin['full_name']}',
-                style:
-                GoogleFonts.poppins(color: Colors.white54, fontSize: 12)),
+                style: GoogleFonts.poppins(
+                    color: Colors.white54, fontSize: 12)),
             const SizedBox(height: 14),
             TextField(
               controller: passC,
@@ -1039,13 +1122,17 @@ class _AdminsTabState extends State<_AdminsTab> {
                 fillColor: Colors.white.withValues(alpha: 0.07),
                 suffixIcon: IconButton(
                   icon: Icon(
-                      obscure ? Icons.visibility_off : Icons.visibility,
-                      color: Colors.white38, size: 18),
+                      obscure
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                      color: Colors.white38,
+                      size: 18),
                   onPressed: () => setS(() => obscure = !obscure),
                 ),
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Colors.white24)),
+                    borderSide:
+                    const BorderSide(color: Colors.white24)),
               ),
             ),
           ]),
@@ -1053,26 +1140,31 @@ class _AdminsTabState extends State<_AdminsTab> {
             TextButton(
                 onPressed: () => Navigator.pop(ctx),
                 child: Text('Cancel',
-                    style: GoogleFonts.poppins(color: Colors.white60))),
+                    style:
+                    GoogleFonts.poppins(color: Colors.white60))),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.redAccent),
               onPressed: () async {
                 final newPass = passC.text.trim();
                 if (newPass.length < 4) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('Password must be at least 4 characters.'),
-                      backgroundColor: Colors.red));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text(
+                              'Password must be at least 4 characters.'),
+                          backgroundColor: Colors.red));
                   return;
                 }
+                // ── FIX: use 'admin_id' PK ──────────────────
                 await supabase
                     .from('admins')
                     .update({'password': newPass})
-                    .eq('id', admin['id']);
+                    .eq('admin_id', admin['admin_id']);
                 if (mounted) Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('Password updated!'),
-                    backgroundColor: Colors.green));
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Password updated!'),
+                        backgroundColor: Colors.green));
               },
               child: Text('Save',
                   style: GoogleFonts.poppins(color: Colors.white)),
@@ -1085,7 +1177,8 @@ class _AdminsTabState extends State<_AdminsTab> {
 
   @override
   Widget build(BuildContext context) {
-    final myId = widget.adminData['id'];
+    // ── FIX: use 'admin_id' PK ────────────────────────────────
+    final myId = widget.adminData['admin_id'];
 
     return _Bg(
       child: SafeArea(
@@ -1112,12 +1205,14 @@ class _AdminsTabState extends State<_AdminsTab> {
                       TextSpan(
                           text: 'Admin ',
                           style: GoogleFonts.poppins(
-                              fontSize: 20, fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
                               color: Colors.white)),
                       TextSpan(
                           text: 'Accounts',
                           style: GoogleFonts.poppins(
-                              fontSize: 20, fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
                               color: Colors.redAccent)),
                     ]),
                   ),
@@ -1139,7 +1234,7 @@ class _AdminsTabState extends State<_AdminsTab> {
               ),
             ),
 
-            // Logged-in info banner
+            // ── Logged-in banner — FIX: use 'email', no 'username' ──
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: Container(
@@ -1154,11 +1249,14 @@ class _AdminsTabState extends State<_AdminsTab> {
                   const Icon(Icons.account_circle,
                       color: Colors.redAccent, size: 20),
                   const SizedBox(width: 10),
-                  Text(
+                  Expanded(
+                    child: Text(
                       'Logged in as: ${widget.adminData['full_name']} '
-                          '(@${widget.adminData['username']})',
+                          '(${widget.adminData['email'] ?? ''})',
                       style: GoogleFonts.poppins(
-                          color: Colors.white70, fontSize: 12)),
+                          color: Colors.white70, fontSize: 12),
+                    ),
+                  ),
                 ]),
               ),
             ),
@@ -1168,28 +1266,38 @@ class _AdminsTabState extends State<_AdminsTab> {
             Expanded(
               child: isLoading
                   ? const Center(
-                  child: CircularProgressIndicator(color: Colors.redAccent))
+                  child: CircularProgressIndicator(
+                      color: Colors.redAccent))
                   : ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: admins.length,
                 itemBuilder: (ctx, i) {
                   final admin = admins[i];
-                  final isMe = admin['id'] == myId;
-                  final isActive = admin['is_active'] == true;
+                  final isMe =
+                      admin['admin_id'] == myId; // ← FIX
+                  // ── FIX: status is 'active'/'inactive' string ──
+                  final isActive =
+                      admin['status'] == 'active';
+                  // ── FIX: last_login column (may be null) ──
                   final lastLogin = admin['last_login'] != null
-                      ? (admin['last_login'] as String).substring(0, 16)
+                      ? (admin['last_login'] as String)
+                      .substring(0, 16)
                       : 'Never';
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.07),
+                      color:
+                      Colors.white.withValues(alpha: 0.07),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: isMe
-                            ? Colors.redAccent.withValues(alpha: 0.6)
+                            ? Colors.redAccent
+                            .withValues(alpha: 0.6)
                             : isActive
-                            ? Colors.greenAccent.withValues(alpha: 0.3)
+                            ? Colors.greenAccent
+                            .withValues(alpha: 0.3)
                             : Colors.white12,
                       ),
                     ),
@@ -1204,8 +1312,10 @@ class _AdminsTabState extends State<_AdminsTab> {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: isMe
-                                    ? Colors.red.withValues(alpha: 0.2)
-                                    : Colors.white.withValues(alpha: 0.07),
+                                    ? Colors.red
+                                    .withValues(alpha: 0.2)
+                                    : Colors.white
+                                    .withValues(alpha: 0.07),
                                 border: Border.all(
                                     color: isMe
                                         ? Colors.redAccent
@@ -1230,74 +1340,96 @@ class _AdminsTabState extends State<_AdminsTab> {
                                 CrossAxisAlignment.start,
                                 children: [
                                   Row(children: [
-                                    Text(admin['full_name'] ?? '',
+                                    Text(
+                                        admin['full_name'] ?? '',
                                         style: GoogleFonts.poppins(
                                             color: Colors.white,
                                             fontSize: 14,
-                                            fontWeight: FontWeight.bold)),
+                                            fontWeight:
+                                            FontWeight.bold)),
                                     if (isMe) ...[
                                       const SizedBox(width: 6),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 6, vertical: 2),
+                                        padding: const EdgeInsets
+                                            .symmetric(
+                                            horizontal: 6,
+                                            vertical: 2),
                                         decoration: BoxDecoration(
                                           color: Colors.red
-                                              .withValues(alpha: 0.2),
+                                              .withValues(
+                                              alpha: 0.2),
                                           borderRadius:
-                                          BorderRadius.circular(6),
+                                          BorderRadius.circular(
+                                              6),
                                           border: Border.all(
                                               color: Colors.redAccent
-                                                  .withValues(alpha: 0.6)),
+                                                  .withValues(
+                                                  alpha: 0.6)),
                                         ),
                                         child: Text('You',
                                             style: GoogleFonts.poppins(
-                                                color: Colors.redAccent,
+                                                color: Colors
+                                                    .redAccent,
                                                 fontSize: 9,
-                                                fontWeight: FontWeight.w600)),
+                                                fontWeight:
+                                                FontWeight
+                                                    .w600)),
                                       ),
                                     ],
                                   ]),
-                                  Text('@${admin['username']}',
+                                  // ── FIX: show email, not username ──
+                                  Text(
+                                      admin['email'] ?? '',
                                       style: GoogleFonts.poppins(
                                           color: Colors.white54,
                                           fontSize: 12)),
                                   const SizedBox(height: 4),
                                   Row(children: [
                                     Icon(Icons.access_time,
-                                        color: Colors.white38, size: 11),
+                                        color: Colors.white38,
+                                        size: 11),
                                     const SizedBox(width: 4),
-                                    Text('Last login: $lastLogin',
+                                    Text(
+                                        'Last login: $lastLogin',
                                         style: GoogleFonts.poppins(
                                             color: Colors.white38,
                                             fontSize: 10)),
                                   ]),
                                   const SizedBox(height: 4),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 3),
+                                    padding: const EdgeInsets
+                                        .symmetric(
+                                        horizontal: 8,
+                                        vertical: 3),
                                     decoration: BoxDecoration(
                                       color: isActive
                                           ? Colors.green
-                                          .withValues(alpha: 0.15)
-                                          : Colors.red
-                                          .withValues(alpha: 0.15),
+                                          .withValues(
+                                          alpha: 0.15)
+                                          : Colors.red.withValues(
+                                          alpha: 0.15),
                                       borderRadius:
                                       BorderRadius.circular(8),
                                       border: Border.all(
                                           color: isActive
                                               ? Colors.greenAccent
-                                              .withValues(alpha: 0.5)
+                                              .withValues(
+                                              alpha: 0.5)
                                               : Colors.redAccent
-                                              .withValues(alpha: 0.5)),
+                                              .withValues(
+                                              alpha: 0.5)),
                                     ),
                                     child: Text(
-                                        isActive ? '🟢 Active' : '🔴 Inactive',
+                                        isActive
+                                            ? '🟢 Active'
+                                            : '🔴 Inactive',
                                         style: GoogleFonts.poppins(
                                             color: isActive
                                                 ? Colors.greenAccent
                                                 : Colors.redAccent,
                                             fontSize: 10,
-                                            fontWeight: FontWeight.w600)),
+                                            fontWeight:
+                                            FontWeight.w600)),
                                   ),
                                 ],
                               ),
@@ -1313,13 +1445,13 @@ class _AdminsTabState extends State<_AdminsTab> {
                                       color: Colors.white
                                           .withValues(alpha: 0.08)))),
                           child: Row(children: [
-                            // Change Password
                             Expanded(
                               child: GestureDetector(
-                                onTap: () => _showChangePassword(admin),
+                                onTap: () =>
+                                    _showChangePassword(admin),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 12),
+                                  padding: const EdgeInsets
+                                      .symmetric(vertical: 12),
                                   decoration: const BoxDecoration(
                                       borderRadius: BorderRadius.only(
                                           bottomLeft:
@@ -1334,32 +1466,39 @@ class _AdminsTabState extends State<_AdminsTab> {
                                       const SizedBox(width: 6),
                                       Text('Change Password',
                                           style: GoogleFonts.poppins(
-                                              color: Colors.blueAccent,
+                                              color:
+                                              Colors.blueAccent,
                                               fontSize: 11,
-                                              fontWeight: FontWeight.w600)),
+                                              fontWeight:
+                                              FontWeight.w600)),
                                     ],
                                   ),
                                 ),
                               ),
                             ),
                             Container(
-                                width: 1, height: 44,
-                                color: Colors.white.withValues(alpha: 0.08)),
-                            // Activate / Deactivate
+                                width: 1,
+                                height: 44,
+                                color: Colors.white
+                                    .withValues(alpha: 0.08)),
                             Expanded(
                               child: GestureDetector(
-                                onTap: () =>
-                                    _toggleActive(admin['id'], isActive),
+                                onTap: () => _toggleActive(
+                                    admin['admin_id'], // ← FIX
+                                    isActive),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 12),
+                                  padding: const EdgeInsets
+                                      .symmetric(vertical: 12),
                                   decoration: BoxDecoration(
                                     color: isActive
-                                        ? Colors.red.withValues(alpha: 0.08)
-                                        : Colors.green
-                                        .withValues(alpha: 0.08),
-                                    borderRadius: const BorderRadius.only(
-                                        bottomRight: Radius.circular(16)),
+                                        ? Colors.red
+                                        .withValues(alpha: 0.08)
+                                        : Colors.green.withValues(
+                                        alpha: 0.08),
+                                    borderRadius:
+                                    const BorderRadius.only(
+                                        bottomRight:
+                                        Radius.circular(16)),
                                   ),
                                   child: Row(
                                     mainAxisAlignment:
@@ -1368,7 +1507,8 @@ class _AdminsTabState extends State<_AdminsTab> {
                                       Icon(
                                           isActive
                                               ? Icons.block
-                                              : Icons.check_circle_outline,
+                                              : Icons
+                                              .check_circle_outline,
                                           color: isActive
                                               ? Colors.redAccent
                                               : Colors.greenAccent,
@@ -1381,9 +1521,11 @@ class _AdminsTabState extends State<_AdminsTab> {
                                           style: GoogleFonts.poppins(
                                               color: isActive
                                                   ? Colors.redAccent
-                                                  : Colors.greenAccent,
+                                                  : Colors
+                                                  .greenAccent,
                                               fontSize: 11,
-                                              fontWeight: FontWeight.w600)),
+                                              fontWeight:
+                                              FontWeight.w600)),
                                     ],
                                   ),
                                 ),

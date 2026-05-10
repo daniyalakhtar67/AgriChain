@@ -80,35 +80,59 @@ class _FarmerRegisterState extends State<FarmerRegister>
       _showSnack('All fields are required', isError: true); return;
     }
     if (cnic.length != 15) { _showSnack('Enter complete 13-digit CNIC', isError: true); return; }
-    if (phone.length != 11) { _showSnack('Phone number must be exactly 11 digits', isError: true); return; }
-    if (pass.length < 6)   { _showSnack('Password must be at least 6 characters', isError: true); return; }
+    if (phone.length != 11) { _showSnack('Phone must be 11 digits', isError: true); return; }
+    if (pass.length < 6)   { _showSnack('Password must be 6+ characters', isError: true); return; }
 
     setState(() => _isLoading = true);
+
     try {
-      final existing = await Supabase.instance.client.from('farmers').select().eq('cnic', cnic);
+      // ✅ Check duplicate in USERS table (cnic is there)
+      final existing = await Supabase.instance.client
+          .from('users')
+          .select('user_id')
+          .eq('cnic', cnic);
+
       if (existing.isNotEmpty) {
         _showSnack('This CNIC is already registered!', isError: true);
-        setState(() => _isLoading = false); return;
+        setState(() => _isLoading = false);
+        return;
       }
+
+      // ✅ Step 1: Insert into users
+      final userResponse = await Supabase.instance.client
+          .from('users')
+          .insert({
+        'name'          : name,
+        'cnic'          : cnic,
+        'contact_number': phone,
+        'password'      : pass,
+        'location'      : homeLoc,
+        'status'        : 'active',
+        'is_verified'   : false,
+      })
+          .select('user_id')
+          .single();
+
+      final userId = userResponse['user_id'];
+
+      // ✅ Step 2: Insert into farmers with correct columns
       await Supabase.instance.client.from('farmers').insert({
-        'full_name'    : name,
-        'cnic'         : cnic,
-        'phone'        : phone,
-        'land'         : land,
-        'farm_location': farmLoc,
-        'home_location': homeLoc,
-        'password'     : pass,
+        'user_id'    : userId,
+        'land_area'  : land,
+        'farmer_card': farmLoc, // farm location stored here
       });
+
       _showSnack('Registration Successful!');
       await Future.delayed(const Duration(seconds: 1));
       if (mounted) Navigator.pop(context);
+
     } catch (e) {
       _showSnack('Something went wrong. Try again.', isError: true);
+      debugPrint('Register error: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
   void _showSnack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg, style: GoogleFonts.poppins(color: Colors.white)),

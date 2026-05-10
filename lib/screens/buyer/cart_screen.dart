@@ -1,10 +1,10 @@
 import 'dart:ui';
+import 'package:argichain/services/user_session.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
-// ✅ FIX: Renamed CartScreen → BuyerCartScreen (matches buyer_dashboard import)
 class BuyerCartScreen extends StatefulWidget {
   const BuyerCartScreen({super.key});
 
@@ -36,12 +36,12 @@ class _BuyerCartScreenState extends State<BuyerCartScreen> {
     super.dispose();
   }
 
-  // ✅ FIX: Buyer uses 'cart' table (not 'farmer_cart')
   Future<void> fetchCart() async {
     try {
       final data = await supabase
-          .from('cart')
-          .select()
+          .from('carts')
+          .select('cart_id, quantity, item_id, items(item_id, name, price, price_unit, image_url)')
+          .eq('user_id', UserSession.id)
           .order('created_at', ascending: false);
       setState(() {
         cartItems = List<Map<String, dynamic>>.from(data);
@@ -55,29 +55,19 @@ class _BuyerCartScreenState extends State<BuyerCartScreen> {
 
   Future<void> removeFromCart(String id) async {
     try {
-      await supabase.from('cart').delete().eq('id', id);
+      await supabase.from('carts').delete().eq('cart_id', id);
       fetchCart();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Item removed!'),
-                backgroundColor: Colors.red));
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Item removed!'), backgroundColor: Colors.red));
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text('Error: $e'), backgroundColor: Colors.red));
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
     }
   }
 
   Future<void> clearCart() async {
     try {
-      await supabase
-          .from('cart')
-          .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('carts').delete().eq('user_id', UserSession.id);
       fetchCart();
     } catch (e) {
       debugPrint('Clear cart error: $e');
@@ -88,66 +78,50 @@ class _BuyerCartScreenState extends State<BuyerCartScreen> {
     if (_nameC.text.trim().isEmpty ||
         _phoneC.text.trim().isEmpty ||
         _addressC.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Please fill all fields!'),
-              backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Please fill all fields!'), backgroundColor: Colors.red));
       return;
     }
 
     setState(() => _placing = true);
 
     try {
+      // Calculate total
+      double total = 0;
       for (final item in cartItems) {
-        final productId = item['product_id']?.toString().trim() ?? '';
-        final orderedQty = int.tryParse(item['quantity'].toString()) ?? 1;
+        final itemData = item['items'] as Map<String, dynamic>? ?? {};
+        final price = double.tryParse(itemData['price']?.toString() ?? '0') ?? 0;
+        final qty   = int.tryParse(item['quantity']?.toString() ?? '1') ?? 1;
+        total += price * qty;
+      }
 
-        await supabase.from('orders').insert({
-          'product_id'    : productId,
-          'product_title' : item['product_title'] ?? '',
-          'product_price' : item['product_price'] ?? '',
-          'seller_name'   : item['seller_name'] ?? '',
-          'seller_type'   : item['seller_type'] ?? 'farmer',
-          'buyer_name'    : _nameC.text.trim(),
-          'buyer_phone'   : _phoneC.text.trim(),
-          'buyer_address' : _addressC.text.trim(),
-          'quantity'      : orderedQty,
-          'status'        : 'pending',
-          'created_at'    : DateTime.now().toIso8601String(),
+      // Insert order
+      final orderResult = await supabase
+          .from('orders')
+          .insert({
+        'user_id'      : UserSession.id,
+        'total_amount' : total,
+        'net_amount'   : total,
+        'status'       : 'placed',
+      })
+          .select('order_id')
+          .single();
+
+      final orderId = orderResult['order_id'];
+
+      // Insert order_items
+      for (final item in cartItems) {
+        final itemData = item['items'] as Map<String, dynamic>? ?? {};
+        await supabase.from('order_items').insert({
+          'order_id' : orderId,
+          'item_id'  : itemData['item_id'],
+          'quantity' : item['quantity'] ?? 1,
+          'price'    : itemData['price'],
         });
-
-        if (productId.isNotEmpty) {
-          try {
-            final res = await supabase
-                .from('products')
-                .select('stock_quantity')
-                .filter('id', 'eq', productId)
-                .maybeSingle();
-
-            if (res != null && res['stock_quantity'] != null) {
-              final currentStock =
-                  int.tryParse(res['stock_quantity'].toString()) ?? 0;
-              final newStock = (currentStock - orderedQty).clamp(0, 999999);
-
-              await supabase
-                  .from('products')
-                  .update({'stock_quantity': newStock})
-                  .filter('id', 'eq', productId);
-
-              debugPrint(
-                  '✅ Stock updated: $currentStock → $newStock for $productId');
-            }
-          } catch (stockErr) {
-            debugPrint('⚠️ Stock deduct error: $stockErr');
-          }
-        }
       }
 
       await clearCart();
-      setState(() {
-        _placing = false;
-        _showForm = false;
-      });
+      setState(() { _placing = false; _showForm = false; });
 
       if (mounted) {
         showDialog(
@@ -155,48 +129,32 @@ class _BuyerCartScreenState extends State<BuyerCartScreen> {
           barrierDismissible: false,
           builder: (_) => AlertDialog(
             backgroundColor: Colors.grey.shade900,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.check_circle,
-                    color: Colors.green, size: 70),
-                const SizedBox(height: 16),
-                Text('All Orders Placed!',
-                    style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text('Sellers will contact you shortly.',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(
-                        color: Colors.white60, fontSize: 13)),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.pop(context);
-                  },
-                  child: Text('Back to Dashboard',
-                      style: GoogleFonts.poppins(color: Colors.white)),
-                ),
-              ],
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            content: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.check_circle, color: Colors.green, size: 70),
+              const SizedBox(height: 16),
+              Text('Order Placed!',
+                  style: GoogleFonts.poppins(
+                      color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text('Sellers will contact you shortly.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(color: Colors.white60, fontSize: 13)),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                onPressed: () { Navigator.pop(context); Navigator.pop(context); },
+                child: Text('Back to Dashboard',
+                    style: GoogleFonts.poppins(color: Colors.white)),
+              ),
+            ]),
           ),
         );
       }
     } catch (e) {
       setState(() => _placing = false);
-      debugPrint('placeAllOrders error: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text('Error: $e'), backgroundColor: Colors.red));
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
     }
   }
 
@@ -302,18 +260,23 @@ class _BuyerCartScreenState extends State<BuyerCartScreen> {
                         horizontal: 16),
                     child: Column(
                       children: [
-                        ...cartItems.map((item) => _CartItem(
-                          item: item,
-                          onRemove: () =>
-                              removeFromCart(item['id']),
-                          onQtyChange: (qty) async {
-                            await supabase
-                                .from('cart')
-                                .update({'quantity': qty})
-                                .eq('id', item['id']);
-                            fetchCart();
-                          },
-                        )),
+                        ...cartItems.map((item) {
+                          // ── FIX: unpack nested 'items' data ──
+                          final itemData =
+                              item['items'] as Map<String, dynamic>? ?? {};
+                          return _CartItem(
+                            item: item,
+                            onRemove: () =>
+                                removeFromCart(item['cart_id']),
+                            onQtyChange: (qty) async {
+                              await supabase
+                                  .from('carts')
+                                  .update({'quantity': qty})
+                                  .eq('cart_id', item['cart_id']);
+                              fetchCart();
+                            },
+                          );
+                        }),
                         const SizedBox(height: 16),
                         ClipRRect(
                           borderRadius:
@@ -512,7 +475,10 @@ class _CartItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ── FIX: unpack nested 'items' data and use correct field names ──
+    final itemData = item['items'] as Map<String, dynamic>? ?? {};
     int qty = item['quantity'] ?? 1;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -525,9 +491,9 @@ class _CartItem extends StatelessWidget {
             borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(16),
                 bottomLeft: Radius.circular(16)),
-            child: item['product_image'] != null
+            child: itemData['image_url'] != null
                 ? CachedNetworkImage(
-                imageUrl: item['product_image'],
+                imageUrl: itemData['image_url'],
                 width: 90,
                 height: 90,
                 fit: BoxFit.cover,
@@ -550,17 +516,19 @@ class _CartItem extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(item['product_title'] ?? '',
+                  Text(itemData['name'] ?? '',
                       style: GoogleFonts.poppins(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                           fontSize: 13)),
                   const SizedBox(height: 2),
-                  Text(item['product_price'] ?? '',
-                      style: GoogleFonts.poppins(
-                          color: Colors.greenAccent,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600)),
+                  Text(
+                    '${itemData['price'] ?? ''} ${itemData['price_unit'] ?? ''}',
+                    style: GoogleFonts.poppins(
+                        color: Colors.greenAccent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 6),
                   Row(
                     children: [

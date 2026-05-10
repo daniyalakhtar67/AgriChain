@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:argichain/screens/buyer/cart_screen.dart';
 import 'package:argichain/screens/farmer/payment.dart';
+import 'package:argichain/services/user_session.dart';
 import 'package:argichain/utils/payment_methods.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -44,7 +45,7 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
     _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeIn);
     _fadeCtrl.forward();
 
-    final kgRaw = widget.product['crop_quantity_kg'];
+    final kgRaw = widget.product['stock_quantity'];
     _availableKg = (kgRaw != null && double.tryParse(kgRaw.toString()) != null)
         ? double.parse(kgRaw.toString())
         : 0;
@@ -72,15 +73,12 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
       return;
     }
     try {
-      await supabase.from('cart').insert({
-        'product_id'   : widget.product['id'],
-        'product_title': widget.product['title'],
-        'product_price': widget.product['price'],
-        'product_image': widget.product['image_url'],
-        'seller_name'  : widget.product['seller_name'],
-        'seller_type'  : 'farmer',
-        'quantity'     : _selectedKg.toInt() > 0 ? _selectedKg.toInt() : 1,
+      await supabase.from('carts').insert({
+        'user_id' : UserSession.id,
+        'item_id' : widget.product['item_id'],
+        'quantity': _selectedKg.toInt() > 0 ? _selectedKg.toInt() : 1,
       });
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -170,23 +168,30 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
           ? double.tryParse(_qtyC.text.trim()) ?? _selectedKg
           : _selectedKg;
 
-      await supabase.from('orders').insert({
-        'product_id'     : widget.product['id'],
-        'product_title'  : widget.product['title'],
-        'product_price'  : widget.product['price'],
-        'seller_name'    : widget.product['seller_name'],
-        'seller_type'    : 'farmer',
-        'buyer_name'     : _nameC.text.trim(),
-        'buyer_phone'    : _phoneC.text.trim(),
-        'buyer_address'  : _addressC.text.trim(),
-        'quantity'       : orderQty.toInt() > 0 ? orderQty.toInt() : 1,
-        'status'         : 'pending',
-        'payment_method' : selectedMethod.name,
-        'payment_account': selectedMethod.requiresAccount
-            ? _accC.text.trim()
-            : null,
-        'created_at'     : DateTime.now().toIso8601String(),
+      // ── FIX: new orders schema with user_id, total_amount, net_amount ──
+      final orderResult = await supabase
+          .from('orders')
+          .insert({
+        'user_id'     : UserSession.id,
+        'total_amount': (double.tryParse(
+            widget.product['price']?.toString() ?? '0') ?? 0) *
+            _selectedKg,
+        'net_amount'  : (double.tryParse(
+            widget.product['price']?.toString() ?? '0') ?? 0) *
+            _selectedKg,
+        'status'      : 'placed',
+      })
+          .select('order_id')
+          .single();
+
+      // ── FIX: insert into order_items with the returned order_id ──
+      await supabase.from('order_items').insert({
+        'order_id': orderResult['order_id'],
+        'item_id' : widget.product['item_id'],
+        'quantity': orderQty.toInt() > 0 ? orderQty.toInt() : 1,
+        'price'   : widget.product['price'],
       });
+
       setState(() { _placing = false; _step = 2; });
     } catch (e) {
       setState(() => _placing = false);

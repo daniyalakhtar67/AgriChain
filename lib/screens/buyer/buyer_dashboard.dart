@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:argichain/screens/buyer/cart_screen.dart';
 import 'package:argichain/screens/buyer/product_screen.dart';
+import 'package:argichain/services/user_session.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -23,7 +24,6 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
   bool isLoading = true;
   int _currentIndex = 0;
 
-  // Profile editable fields
   late String _displayName;
   String _phone = '';
   String _location = '';
@@ -31,7 +31,9 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
   @override
   void initState() {
     super.initState();
-    _displayName = widget.buyerName;
+    _displayName = UserSession.name;
+    _phone       = UserSession.phone;
+    _location    = UserSession.location;
     fetchFarmerProducts();
     searchController.addListener(_onSearch);
   }
@@ -45,10 +47,8 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
   Future<void> fetchFarmerProducts() async {
     try {
       final data = await supabase
-          .from('products')
-          .select()
-          .eq('seller_type', 'farmer')
-          .order('created_at', ascending: false);
+          .from('view_farmer_items')
+          .select();
       setState(() {
         allProducts = List<Map<String, dynamic>>.from(data);
         filteredProducts = allProducts;
@@ -68,13 +68,14 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
     final query = searchController.text.toLowerCase();
     setState(() {
       filteredProducts = allProducts.where((p) {
-        return (p['title'] ?? '').toString().toLowerCase().contains(query) ||
-            (p['category'] ?? '').toString().toLowerCase().contains(query);
+        return (p['name']          ?? '').toString().toLowerCase().contains(query) ||
+            (p['category_name'] ?? '').toString().toLowerCase().contains(query);
       }).toList();
     });
   }
 
   void _logout() {
+    UserSession.clear();
     Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
   }
 
@@ -131,7 +132,7 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
     );
   }
 
-  // ── BUY SCREEN ─────────────────────────────────────────────────────────────
+  // ── BUY SCREEN ──────────────────────────────────────────────────────────────
   Widget _buildBuyScreen() {
     return Stack(
       children: [
@@ -154,8 +155,7 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: BackdropFilter(
-                          filter:
-                          ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 24, vertical: 10),
@@ -218,8 +218,7 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       hintText: 'Search crops...',
-                      hintStyle:
-                      GoogleFonts.poppins(color: Colors.white60),
+                      hintStyle: GoogleFonts.poppins(color: Colors.white60),
                       prefixIcon:
                       const Icon(Icons.search, color: Colors.white60),
                       border: InputBorder.none,
@@ -234,8 +233,8 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
 
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 10),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
                   color: Colors.grey.withValues(alpha: 0.35),
                   borderRadius: BorderRadius.circular(12),
@@ -263,18 +262,17 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
               Expanded(
                 child: isLoading
                     ? const Center(
-                    child:
-                    CircularProgressIndicator(color: Colors.green))
+                    child: CircularProgressIndicator(color: Colors.green))
                     : filteredProducts.isEmpty
                     ? Center(
                     child: Text('No crops found',
-                        style: GoogleFonts.poppins(
-                            color: Colors.white)))
+                        style:
+                        GoogleFonts.poppins(color: Colors.white)))
                     : RefreshIndicator(
                   onRefresh: fetchFarmerProducts,
                   child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16),
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: filteredProducts.length,
                     itemBuilder: (context, index) {
                       return _ProductCard(
@@ -290,7 +288,7 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
     );
   }
 
-  // ── PROFILE SCREEN ─────────────────────────────────────────────────────────
+  // ── PROFILE SCREEN ──────────────────────────────────────────────────────────
   Widget _buildProfileScreen() {
     return Stack(
       children: [
@@ -346,8 +344,8 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
                     border: Border.all(color: Colors.green, width: 3),
                     color: Colors.white.withValues(alpha: 0.1),
                   ),
-                  child: const Icon(Icons.person,
-                      color: Colors.green, size: 48),
+                  child:
+                  const Icon(Icons.person, color: Colors.green, size: 48),
                 ),
 
                 const SizedBox(height: 14),
@@ -401,13 +399,12 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
 
                 const SizedBox(height: 28),
 
-                // ── Edit Button ──
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: _showEditProfileDialog,
-                    icon:
-                    const Icon(Icons.edit_outlined, color: Colors.yellow),
+                    icon: const Icon(Icons.edit_outlined,
+                        color: Colors.yellow),
                     label: Text('Edit Profile',
                         style: GoogleFonts.poppins(
                             color: Colors.yellow,
@@ -504,8 +501,7 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
               borderRadius: BorderRadius.circular(20)),
           title: Text('Edit Profile',
               style: GoogleFonts.poppins(
-                  color: Colors.yellow,
-                  fontWeight: FontWeight.bold)),
+                  color: Colors.yellow, fontWeight: FontWeight.bold)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -517,7 +513,8 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
                     accentColor: Colors.yellow,
                     keyboardType: TextInputType.phone),
                 const SizedBox(height: 10),
-                _dialogField('Location', locationC, Icons.location_on_outlined,
+                _dialogField(
+                    'Location', locationC, Icons.location_on_outlined,
                     accentColor: Colors.yellow),
               ],
             ),
@@ -543,7 +540,6 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
                   return;
                 }
                 setS(() => saving = true);
-                // Small delay to show loading
                 await Future.delayed(
                     const Duration(milliseconds: 300));
                 if (mounted) {
@@ -568,7 +564,8 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
                   child: CircularProgressIndicator(
                       color: Colors.white, strokeWidth: 2))
                   : Text('Save',
-                  style: GoogleFonts.poppins(color: Colors.white)),
+                  style:
+                  GoogleFonts.poppins(color: Colors.white)),
             ),
           ],
         ),
@@ -605,7 +602,7 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
   }
 }
 
-// ── PRODUCT CARD ──────────────────────────────────────────────────────────────
+// ── PRODUCT CARD ───────────────────────────────────────────────────────────────
 class _ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
   const _ProductCard({required this.product});
@@ -613,44 +610,39 @@ class _ProductCard extends StatelessWidget {
   Future<void> _quickAddToCart(BuildContext context) async {
     final supabase = Supabase.instance.client;
     try {
-      await supabase.from('cart').insert({
-        'product_id': product['id'],
-        'product_title': product['title'],
-        'product_price': product['price'],
-        'product_image': product['image_url'],
-        'seller_name': product['seller_name'],
-        'seller_type': product['seller_type'] ?? 'farmer',
+      await supabase.from('carts').insert({
+        'user_id': UserSession.id,
+        'item_id': product['item_id'],
         'quantity': 1,
       });
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle,
-                    color: Colors.white, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text('${product['title']} added to cart!',
-                      style: GoogleFonts.poppins(
-                          color: Colors.white, fontSize: 13)),
+            content: Row(children: [
+              const Icon(Icons.check_circle, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${product['name']} added to cart!',
+                  style: GoogleFonts.poppins(
+                      color: Colors.white, fontSize: 13),
                 ),
-                GestureDetector(
-                  onTap: () {
-                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const BuyerCartScreen()));
-                  },
-                  child: Text('View Cart',
-                      style: GoogleFonts.poppins(
-                          color: Colors.yellow,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13)),
-                ),
-              ],
-            ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const BuyerCartScreen()));
+                },
+                child: Text('View Cart',
+                    style: GoogleFonts.poppins(
+                        color: Colors.yellow,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13)),
+              ),
+            ]),
             backgroundColor: Colors.green.shade700,
             duration: const Duration(seconds: 3),
           ),
@@ -659,9 +651,9 @@ class _ProductCard extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+            SnackBar(
+                content: Text('Error: $e'),
+                backgroundColor: Colors.red));
       }
     }
   }
@@ -683,6 +675,7 @@ class _ProductCard extends StatelessWidget {
         ),
         child: Row(
           children: [
+            // ── Product Image ──
             ClipRRect(
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(16),
@@ -716,6 +709,8 @@ class _ProductCard extends StatelessWidget {
                 const Icon(Icons.image, color: Colors.white54),
               ),
             ),
+
+            // ── Product Info ──
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -723,28 +718,41 @@ class _ProductCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Name + Price row
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Flexible(
-                          child: Text(product['title'] ?? '',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white)),
-                        ),
-                        Text(product['price'] ?? '',
+                          child: Text(
+                            '${product['name'] ?? ''}',           // ✅ Fix 1
                             style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.greenAccent)),
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white),
+                          ),
+                        ),
+                        Text(
+                          'Rs. ${product['price'] ?? ''}',        // ✅ Fix 2
+                          style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.greenAccent),
+                        ),
                       ],
                     ),
+
                     const SizedBox(height: 4),
-                    Text(product['location'] ?? '',
-                        style: GoogleFonts.poppins(
-                            fontSize: 11, color: Colors.white60)),
+
+                    // Seller location                            // ✅ Fix 3
+                    Text(
+                      '${product['seller_location'] ?? ''}',
+                      style: GoogleFonts.poppins(
+                          fontSize: 11, color: Colors.white60),
+                    ),
+
                     const SizedBox(height: 6),
+
+                    // Category + Add button row
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -754,11 +762,13 @@ class _ProductCard extends StatelessWidget {
                           decoration: BoxDecoration(
                               color: Colors.green.withValues(alpha: 0.3),
                               borderRadius: BorderRadius.circular(8)),
-                          child: Text(product['category'] ?? '',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 11,
-                                  color: Colors.greenAccent,
-                                  fontWeight: FontWeight.w500)),
+                          child: Text(
+                            '${product['category_name'] ?? ''}',  // ✅ Fix 4
+                            style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                color: Colors.greenAccent,
+                                fontWeight: FontWeight.w500),
+                          ),
                         ),
                         GestureDetector(
                           onTap: () => _quickAddToCart(context),

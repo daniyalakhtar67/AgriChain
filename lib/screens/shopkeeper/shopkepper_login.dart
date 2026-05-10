@@ -12,7 +12,7 @@ class ShopkeeperLogin extends StatelessWidget {
       title: "Shopkeeper",
       imagePath: "assets/images/SH.avif",
       registerPage: const ShopkeeperRegister(),
-      dashboardPage:  ShopkeeperDashboard(shopkeeperName: 'Daniyal'),
+      dashboardPage:  ShopkeeperDashboard(userId: 'userId', shopkeeperName: 'Daniyal'),
       role: "shopkeeper",
     );
   }

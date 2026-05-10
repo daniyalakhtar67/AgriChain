@@ -4,6 +4,7 @@ import 'package:argichain/screens/farmer/crop_detail_screen.dart';
 import 'package:argichain/screens/farmer/cropdetailscreen.dart';
 import 'package:argichain/screens/farmer/payment.dart';
 import 'package:argichain/screens/farmer/product_details.dart';
+import 'package:argichain/services/user_session.dart';
 import 'package:argichain/utils/payment_methods.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -27,7 +28,6 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
   bool isLoading = true;
   int _currentIndex = 0;
 
-  // FIX #4: _cropsFuture field
   late Future<List<Map<String, dynamic>>> _cropsFuture;
 
   @override
@@ -35,7 +35,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
     super.initState();
     fetchShopkeeperProducts();
     searchController.addListener(_onSearch);
-    _reloadCrops(); // FIX #4
+    _reloadCrops();
   }
 
   @override
@@ -44,15 +44,13 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
     super.dispose();
   }
 
-  // FIX #4: _reloadCrops method — also fixes Issue #1 via seller_name filter
   void _reloadCrops() {
     setState(() {
       _cropsFuture = supabase
-          .from('products')
+          .from('view_farmer_items')
           .select()
-          .eq('seller_type', 'farmer')
           .eq('seller_name', widget.farmerName)
-          .order('created_at', ascending: false)
+          .order('listed_date', ascending: false)
           .then((data) => List<Map<String, dynamic>>.from(data));
     });
   }
@@ -60,10 +58,10 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
   Future<void> fetchShopkeeperProducts() async {
     try {
       final data = await supabase
-          .from('products')
+          .from('view_shopkeeper_items')
           .select()
-          .eq('seller_type', 'shopkeeper')
-          .order('created_at', ascending: false);
+          .order('listed_date', ascending: false);
+
       setState(() {
         allProducts = List<Map<String, dynamic>>.from(data);
         filteredProducts = allProducts;
@@ -83,13 +81,15 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
     final query = searchController.text.toLowerCase();
     setState(() {
       filteredProducts = allProducts.where((p) {
-        return p['title'].toString().toLowerCase().contains(query) ||
-            p['category'].toString().toLowerCase().contains(query);
+        final name     = (p['name']          ?? '').toString().toLowerCase();
+        final category = (p['category_name'] ?? '').toString().toLowerCase();
+        return name.contains(query) || category.contains(query);
       }).toList();
     });
   }
 
   void _logout() {
+    UserSession.clear();
     Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
   }
 
@@ -281,8 +281,8 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                     : filteredProducts.isEmpty
                     ? Center(
                     child: Text('No equipment found',
-                        style: GoogleFonts.poppins(
-                            color: Colors.white)))
+                        style:
+                        GoogleFonts.poppins(color: Colors.white)))
                     : RefreshIndicator(
                   onRefresh: fetchShopkeeperProducts,
                   child: ListView.builder(
@@ -369,7 +369,6 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                 ),
               ),
               Expanded(
-                // FIX #4: Use _cropsFuture instead of inline future
                 child: FutureBuilder<List<Map<String, dynamic>>>(
                   future: _cropsFuture,
                   builder: (context, snapshot) {
@@ -378,7 +377,6 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                           child: CircularProgressIndicator(
                               color: Colors.green));
                     }
-                    // FIX #4: snapshot.data is already typed list
                     final crops = snapshot.data ?? [];
                     if (crops.isEmpty) {
                       return Center(
@@ -389,20 +387,20 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                           ));
                     }
                     return ListView.builder(
-                      padding:
-                      const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
                       itemCount: crops.length,
                       itemBuilder: (context, index) {
                         final crop = crops[index];
-                        final kgQty = crop['crop_quantity_kg'];
-                        final kgVal = (kgQty != null &&
-                            double.tryParse(kgQty.toString()) != null)
-                            ? double.parse(kgQty.toString())
-                            : 0.0;
+
+                        // ✅ Fix: new view uses 'quantity' as text e.g. '100 kg'
+                        // Parse number from the quantity string
+                        final qtyRaw = crop['quantity']?.toString() ?? '0';
+                        final kgVal = double.tryParse(
+                            qtyRaw.replaceAll(RegExp(r'[^0-9.]'), '')) ??
+                            0.0;
                         final bool hasStock = kgVal > 0;
 
                         return GestureDetector(
-                          // FIX #4: _reloadCrops() after returning from detail
                           onTap: () async {
                             await Navigator.push(
                               context,
@@ -434,20 +432,22 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                                     : const Icon(Icons.grass,
                                     color: Colors.green),
                               ),
-                              title: Text(crop['title'] ?? '',
+                              // ✅ Fix: 'name' not 'title'
+                              title: Text(crop['name'] ?? '',
                                   style: GoogleFonts.poppins(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold)),
                               subtitle: Column(
-                                crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  // ✅ Fix: 'category_name' not 'category'
                                   Text(
-                                      '${crop['category']} • ${crop['price']}',
+                                      '${crop['category_name'] ?? ''} • Rs. ${crop['price'] ?? ''}',
                                       style: GoogleFonts.poppins(
                                           color: Colors.white70,
                                           fontSize: 12)),
                                   const SizedBox(height: 4),
+                                  // ✅ Fix: 'payment_method' still exists in view
                                   if (crop['payment_method'] != null &&
                                       crop['payment_method']
                                           .toString()
@@ -469,8 +469,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                                       color: hasStock
                                           ? Colors.green.withValues(alpha: 0.3)
                                           : Colors.red.withValues(alpha: 0.3),
-                                      borderRadius:
-                                      BorderRadius.circular(6),
+                                      borderRadius: BorderRadius.circular(6),
                                       border: Border.all(
                                           color: hasStock
                                               ? Colors.greenAccent
@@ -495,7 +494,9 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                               trailing: IconButton(
                                 icon: const Icon(Icons.delete,
                                     color: Colors.redAccent),
-                                onPressed: () => _deleteCrop(crop['id']),
+                                // ✅ Fix: 'item_id' not 'id'
+                                onPressed: () => _deleteCrop(
+                                    crop['item_id'].toString()),
                               ),
                             ),
                           ),
@@ -620,6 +621,24 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _logout,
+                    icon: const Icon(Icons.logout, color: Colors.white),
+                    label: Text('Logout',
+                        style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.shade700,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -682,7 +701,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            dialogField('Name', nameC, Icons.person_outline,
+            _dialogField('Name', nameC, Icons.person_outline,
                 accentColor: Colors.yellow),
           ],
         ),
@@ -715,13 +734,12 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
   void _showAddCropDialog() {
     final titleC      = TextEditingController();
     final priceC      = TextEditingController();
-    final locationC   = TextEditingController();
+    final descC       = TextEditingController();
     final imageC      = TextEditingController();
     final quantityKgC = TextEditingController();
 
     List<String> selectedPaymentIds = [];
     final Map<String, TextEditingController> accControllers = {};
-
     bool saving = false;
 
     showDialog(
@@ -734,27 +752,29 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                 borderRadius: BorderRadius.circular(20)),
             title: Text('Add Crop',
                 style: GoogleFonts.poppins(
-                    color: Colors.yellow,
-                    fontWeight: FontWeight.bold)),
+                    color: Colors.yellow, fontWeight: FontWeight.bold)),
             content: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  dialogField('Title', titleC, Icons.title,
+                  _dialogField('Crop Name', titleC, Icons.grass,
                       accentColor: Colors.yellow),
-                  dialogField('Price', priceC, Icons.attach_money,
+                  _dialogField('Price (e.g. 6000)', priceC,
+                      Icons.attach_money,
+                      accentColor: Colors.yellow,
+                      keyboardType: TextInputType.number),
+                  _dialogField('Description (optional)', descC,
+                      Icons.description_outlined,
                       accentColor: Colors.yellow),
-                  dialogField('Location', locationC, Icons.location_on,
-                      accentColor: Colors.yellow),
-                  dialogField(
+                  _dialogField(
                     'Quantity Available (KG)',
                     quantityKgC,
                     Icons.scale_outlined,
                     accentColor: Colors.yellow,
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true),
+                    keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
                   ),
-                  dialogField('Image URL (optional)', imageC, Icons.image,
+                  _dialogField('Image URL (optional)', imageC, Icons.image,
                       accentColor: Colors.yellow),
                   const SizedBox(height: 10),
                   MultiPaymentSelector(
@@ -782,11 +802,11 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                 onPressed: saving
                     ? null
                     : () async {
-                  if (titleC.text.isEmpty ||
-                      priceC.text.isEmpty) {
+                  if (titleC.text.isEmpty || priceC.text.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                            content: Text('Title, Category, Price required'),
+                            content:
+                            Text('Name aur Price zaroor bharo!'),
                             backgroundColor: Colors.red));
                     return;
                   }
@@ -794,17 +814,21 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                   if (selectedPaymentIds.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                            content: Text('Kam az kam ek payment method select karo!'),
+                            content: Text(
+                                'Kam az kam ek payment method select karo!'),
                             backgroundColor: Colors.orange));
                     return;
                   }
 
                   for (final id in selectedPaymentIds) {
-                    final m = kPaymentMethods.firstWhere((m) => m.id == id);
+                    final m = kPaymentMethods
+                        .firstWhere((m) => m.id == id);
                     if (m.requiresAccount &&
-                        (accControllers[id]?.text.trim().isEmpty ?? true)) {
+                        (accControllers[id]?.text.trim().isEmpty ??
+                            true)) {
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text('${m.name} ka account number enter karo!'),
+                          content: Text(
+                              '${m.name} ka account number enter karo!'),
                           backgroundColor: Colors.orange));
                       return;
                     }
@@ -812,40 +836,68 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
 
                   setS(() => saving = true);
                   try {
-                    final paymentMethodsJson = selectedPaymentIds.map((id) {
-                      final m = kPaymentMethods.firstWhere((m) => m.id == id);
-                      return {
-                        'id': m.id,
-                        'name': m.name,
-                        'account': m.requiresAccount
-                            ? (accControllers[id]?.text.trim() ?? '')
-                            : '',
-                      };
-                    }).toList();
+                    // ── Step 1: Get farmer's user_id ──
+                    final userRes = await supabase
+                        .from('users')
+                        .select('user_id')
+                        .eq('name', widget.farmerName)
+                        .maybeSingle();
 
-                    final firstMethod = kPaymentMethods
-                        .firstWhere((m) => m.id == selectedPaymentIds.first);
-                    final legacyAccount = firstMethod.requiresAccount
-                        ? (accControllers[selectedPaymentIds.first]?.text.trim() ?? '')
-                        : null;
+                    if (userRes == null) {
+                      throw Exception('Farmer user not found');
+                    }
+                    final userId = userRes['user_id'];
 
-                    await supabase.from('products').insert({
-                      'title': titleC.text.trim(),
-                      'price': priceC.text.trim(),
-                      'location': locationC.text.trim(),
-                      'image_url': imageC.text.trim().isEmpty
+                    // ── Step 2: Get Crops category_id ──
+                    final catRes = await supabase
+                        .from('categories')
+                        .select('category_id')
+                        .eq('category_name', 'Crops')
+                        .maybeSingle();
+
+                    final categoryId = catRes?['category_id'];
+
+                    // ── Step 3: Build payment method string ──
+                    final firstMethod = kPaymentMethods.firstWhere(
+                            (m) => m.id == selectedPaymentIds.first);
+
+                    // ── Step 4: Insert into items ──
+                    final itemRes = await supabase
+                        .from('items')
+                        .insert({
+                      'user_id'    : userId,
+                      'category_id': categoryId,
+                      'name'       : titleC.text.trim(),
+                      'description': descC.text.trim(),
+                      'price'      : double.tryParse(
+                          priceC.text.trim()) ??
+                          0,
+                      'price_unit' : 'per kg',
+                      'unit'       : 'kg',
+                      'quantity'   :
+                      '${quantityKgC.text.trim()} kg',
+                      'image_url'  :
+                      imageC.text.trim().isEmpty
                           ? null
                           : imageC.text.trim(),
-                      'seller_type': 'farmer',
-                      'seller_name': widget.farmerName,
-                      'crop_quantity_kg':
-                      double.tryParse(quantityKgC.text.trim()) ?? 0,
-                      'payment_methods_json': paymentMethodsJson,
+                      'status'     : 'active',
                       'payment_method': firstMethod.name,
-                      'payment_account': legacyAccount,
+                    })
+                        .select('item_id')
+                        .single();
+
+                    final itemId = itemRes['item_id'];
+
+                    // ── Step 5: Insert into crops ──
+                    await supabase.from('crops').insert({
+                      'item_id'  : itemId,
+                      'user_id'  : userId,
+                      'crop_type': titleC.text.trim(),
                     });
 
-                    for (final c in accControllers.values) c.dispose();
+                    for (final c in accControllers.values) {
+                      c.dispose();
+                    }
 
                     if (mounted) {
                       Navigator.pop(ctx);
@@ -863,8 +915,13 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                   setS(() => saving = false);
                 },
                 child: saving
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : Text('Add', style: GoogleFonts.poppins(color: Colors.white)),
+                    ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2))
+                    : Text('Add',
+                    style: GoogleFonts.poppins(color: Colors.white)),
               ),
             ],
           );
@@ -873,57 +930,58 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
     );
   }
 
-  // FIX #4: _reloadCrops() instead of setState
-  Future<void> _deleteCrop(String id) async {
+  Future<void> _deleteCrop(String itemId) async {
     try {
-      await supabase.from('products').delete().eq('id', id);
+      // ✅ Fix: delete from items table using item_id (cascades to crops)
+      await supabase.from('items').delete().eq('item_id', itemId);
       _reloadCrops();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Crop Deleted!'),
-            backgroundColor: Colors.red));
+            content: Text('Crop Deleted!'), backgroundColor: Colors.red));
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Error: $e'), backgroundColor: Colors.red));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Error: $e'), backgroundColor: Colors.red));
+      }
     }
+  }
+
+  Widget _dialogField(
+      String label,
+      TextEditingController controller,
+      IconData icon, {
+        Color accentColor = Colors.green,
+        TextInputType keyboardType = TextInputType.text,
+      }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
+        controller: controller,
+        keyboardType: keyboardType,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle:
+          TextStyle(color: accentColor.withValues(alpha: 0.8)),
+          prefixIcon: Icon(icon, color: accentColor, size: 20),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: Colors.white24),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: accentColor),
+          ),
+          filled: true,
+          fillColor: Colors.white.withValues(alpha: 0.05),
+        ),
+      ),
+    );
   }
 }
 
-// ── HELPER: dialog text field ─────────────────────────────────────────────────
-Widget dialogField(
-    String label,
-    TextEditingController controller,
-    IconData icon, {
-      Color accentColor = Colors.green,
-      TextInputType keyboardType = TextInputType.text,
-    }) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      style: const TextStyle(color: Colors.white),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: accentColor.withValues(alpha: 0.8)),
-        prefixIcon: Icon(icon, color: accentColor, size: 20),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.white24),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: accentColor),
-        ),
-        filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.05),
-      ),
-    ),
-  );
-}
-
-// ── PRODUCT CARD — with all fixes ─────────────────────────────────────────────
+// ── PRODUCT CARD ──────────────────────────────────────────────────────────────
 class _ProductCard extends StatefulWidget {
   final Map<String, dynamic> product;
   final VoidCallback onCartUpdate;
@@ -937,6 +995,15 @@ class _ProductCardState extends State<_ProductCard> {
   final supabase = Supabase.instance.client;
   bool _adding = false;
   late int _stockVal;
+
+  // ✅ Fix: new view uses 'name', 'category_name', 'seller_name', 'seller_location'
+  String get _title    => widget.product['name']           ?? '';
+  String get _price    => widget.product['price']?.toString() ?? '';
+  String get _location => widget.product['seller_location'] ?? '';
+  String get _category => widget.product['category_name']  ?? '';
+  String get _imageUrl => widget.product['image_url']      ?? '';
+  String get _seller   => widget.product['seller_name']    ?? '';
+  String get _itemId   => widget.product['item_id']?.toString() ?? '';
 
   @override
   void initState() {
@@ -959,14 +1026,15 @@ class _ProductCardState extends State<_ProductCard> {
 
     setState(() => _adding = true);
     try {
-      // FIX #2: Re-check live stock from DB before adding
+      // ✅ Fix: check stock from items/products table using item_id
       final res = await supabase
           .from('products')
           .select('stock_quantity')
-          .eq('id', widget.product['id'])
-          .single();
+          .eq('item_id', _itemId)
+          .maybeSingle();
 
-      final liveStock = int.tryParse(res['stock_quantity'].toString()) ?? 0;
+      final liveStock =
+          int.tryParse(res?['stock_quantity']?.toString() ?? '0') ?? 0;
 
       if (liveStock <= 0) {
         if (mounted) {
@@ -983,27 +1051,24 @@ class _ProductCardState extends State<_ProductCard> {
         return;
       }
 
-      // FIX #3: Check if already in cart — update qty instead of duplicate
+      // ✅ Fix: cart uses item_id column
       final existing = await supabase
-          .from('farmer_cart')
-          .select('id, quantity')
-          .eq('product_id', widget.product['id'].toString())
+          .from('carts')
+          .select('cart_id, quantity')
+          .eq('user_id', UserSession.id)
+          .eq('item_id', _itemId)
           .maybeSingle();
 
       if (existing != null) {
         final newQty = (existing['quantity'] as int) + 1;
         await supabase
-            .from('farmer_cart')
+            .from('carts')
             .update({'quantity': newQty})
-            .eq('id', existing['id']);
+            .eq('cart_id', existing['cart_id']);
       } else {
-        await supabase.from('farmer_cart').insert({
-          'product_id': widget.product['id'],
-          'product_title': widget.product['title'],
-          'product_price': widget.product['price'],
-          'product_image': widget.product['image_url'],
-          'seller_name': widget.product['seller_name'],
-          'seller_type': widget.product['seller_type'],
+        await supabase.from('carts').insert({
+          'user_id' : UserSession.id,
+          'item_id' : _itemId,
           'quantity': 1,
         });
       }
@@ -1060,11 +1125,11 @@ class _ProductCardState extends State<_ProductCard> {
             MaterialPageRoute(
                 builder: (_) =>
                     ProductDetailScreen(product: widget.product)));
-        // Refresh stock after returning from detail screen
+        // ✅ Fix: refresh using item_id from products table
         final res = await supabase
             .from('products')
             .select('stock_quantity')
-            .eq('id', widget.product['id'])
+            .eq('item_id', _itemId)
             .maybeSingle();
         if (res != null && mounted) {
           setState(() {
@@ -1088,9 +1153,9 @@ class _ProductCardState extends State<_ProductCard> {
                   borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(16),
                       bottomLeft: Radius.circular(16)),
-                  child: widget.product['image_url'] != null
+                  child: _imageUrl.isNotEmpty
                       ? CachedNetworkImage(
-                    imageUrl: widget.product['image_url'],
+                    imageUrl: _imageUrl,
                     width: 110,
                     height: 100,
                     fit: BoxFit.cover,
@@ -1113,8 +1178,8 @@ class _ProductCardState extends State<_ProductCard> {
                       width: 110,
                       height: 100,
                       color: Colors.grey.shade800,
-                      child:
-                      const Icon(Icons.image, color: Colors.white54)),
+                      child: const Icon(Icons.image,
+                          color: Colors.white54)),
                 ),
                 Expanded(
                   child: Padding(
@@ -1124,15 +1189,16 @@ class _ProductCardState extends State<_ProductCard> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          mainAxisAlignment:
+                          MainAxisAlignment.spaceBetween,
                           children: [
                             Flexible(
-                                child: Text(widget.product['title'] ?? '',
+                                child: Text(_title,
                                     style: GoogleFonts.poppins(
                                         fontSize: 15,
                                         fontWeight: FontWeight.bold,
                                         color: Colors.white))),
-                            Text(widget.product['price'] ?? '',
+                            Text('Rs. $_price',
                                 style: GoogleFonts.poppins(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
@@ -1140,7 +1206,7 @@ class _ProductCardState extends State<_ProductCard> {
                           ],
                         ),
                         const SizedBox(height: 4),
-                        Text(widget.product['location'] ?? '',
+                        Text(_location,
                             style: GoogleFonts.poppins(
                                 fontSize: 11, color: Colors.white60)),
                         const SizedBox(height: 6),
@@ -1150,9 +1216,11 @@ class _ProductCardState extends State<_ProductCard> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                  color: Colors.green.withValues(alpha: 0.3),
-                                  borderRadius: BorderRadius.circular(8)),
-                              child: Text(widget.product['category'] ?? '',
+                                  color:
+                                  Colors.green.withValues(alpha: 0.3),
+                                  borderRadius:
+                                  BorderRadius.circular(8)),
+                              child: Text(_category,
                                   style: GoogleFonts.poppins(
                                       fontSize: 11,
                                       color: Colors.greenAccent,
@@ -1163,8 +1231,10 @@ class _ProductCardState extends State<_ProductCard> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                  color: Colors.blue.withValues(alpha: 0.25),
-                                  borderRadius: BorderRadius.circular(8),
+                                  color: Colors.blue
+                                      .withValues(alpha: 0.25),
+                                  borderRadius:
+                                  BorderRadius.circular(8),
                                   border: Border.all(
                                       color: Colors.lightBlueAccent
                                           .withValues(alpha: 0.4))),
@@ -1238,8 +1308,7 @@ class _ProductCardState extends State<_ProductCard> {
                             size: 16,
                           ),
                           const SizedBox(width: 4),
-                          Text(
-                              inStock ? 'Add' : 'N/A',
+                          Text(inStock ? 'Add' : 'N/A',
                               style: GoogleFonts.poppins(
                                   color: Colors.white,
                                   fontSize: 13,

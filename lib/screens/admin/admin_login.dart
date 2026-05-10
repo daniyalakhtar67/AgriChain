@@ -12,22 +12,22 @@ class AdminLoginScreen extends StatefulWidget {
 
 class _AdminLoginScreenState extends State<AdminLoginScreen>
     with SingleTickerProviderStateMixin {
-  final _userC = TextEditingController();
-  final _passC = TextEditingController();
+  final _emailC = TextEditingController();
+  final _passC  = TextEditingController();
   bool _obscure = true;
   bool _loading = false;
   String? _error;
 
   late AnimationController _animCtrl;
-  late Animation<double> _fadeAnim;
-  late Animation<Offset> _slideAnim;
+  late Animation<double>   _fadeAnim;
+  late Animation<Offset>   _slideAnim;
 
   @override
   void initState() {
     super.initState();
     _animCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 700));
-    _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
+    _fadeAnim  = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
     _slideAnim = Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero)
         .animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut));
     _animCtrl.forward();
@@ -36,16 +36,16 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
   @override
   void dispose() {
     _animCtrl.dispose();
-    _userC.dispose();
+    _emailC.dispose();
     _passC.dispose();
     super.dispose();
   }
 
   Future<void> _login() async {
-    final username = _userC.text.trim().toLowerCase();
+    final email    = _emailC.text.trim().toLowerCase();
     final password = _passC.text.trim();
 
-    if (username.isEmpty || password.isEmpty) {
+    if (email.isEmpty || password.isEmpty) {
       setState(() => _error = 'Please fill in all fields.');
       return;
     }
@@ -53,18 +53,19 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
     setState(() { _error = null; _loading = true; });
 
     try {
-      final supabase = Supabase.instance.client;
-
-      // Fetch admin from DB
-      final res = await supabase
+      // Query by email + active status
+      final res = await Supabase.instance.client
           .from('admins')
           .select()
-          .eq('username', username)
-          .eq('is_active', true)
+          .eq('email', email)
+          .eq('status', 'active')
           .maybeSingle();
 
       if (res == null) {
-        setState(() { _error = 'Admin not found or inactive.'; _loading = false; });
+        setState(() {
+          _error   = 'Admin not found or account is inactive.';
+          _loading = false;
+        });
         return;
       }
 
@@ -73,22 +74,30 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
         return;
       }
 
-      // Update last_login
-      await supabase
+      // Update last_login timestamp
+      await Supabase.instance.client
           .from('admins')
-          .update({'last_login': DateTime.now().toIso8601String()})
-          .eq('id', res['id']);
+          .update({'last_login': DateTime.now().toUtc().toIso8601String()})
+          .eq('admin_id', res['admin_id']);
 
       if (mounted) {
+        // Re-fetch so adminData has updated last_login
+        final updated = await Supabase.instance.client
+            .from('admins')
+            .select()
+            .eq('admin_id', res['admin_id'])
+            .single();
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => AdminDashboard(adminData: res)
-          ),
+              builder: (_) => AdminDashboard(adminData: updated)),
         );
       }
+    } on PostgrestException catch (e) {
+      setState(() { _error = 'Database error: ${e.message}'; _loading = false; });
     } catch (e) {
-      setState(() { _error = 'Error: $e'; _loading = false; });
+      setState(() { _error = 'Unexpected error: $e'; _loading = false; });
     }
   }
 
@@ -181,9 +190,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                               child: Column(
                                 children: [
                                   _inputField(
-                                    controller: _userC,
-                                    label: 'Admin Username',
-                                    icon: Icons.person_outline,
+                                    controller: _emailC,
+                                    label: 'Admin Email',
+                                    icon: Icons.email_outlined,
+                                    keyboardType: TextInputType.emailAddress,
                                   ),
                                   const SizedBox(height: 14),
                                   _inputField(
@@ -260,10 +270,12 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
     required IconData icon,
     bool obscure = false,
     Widget? suffix,
+    TextInputType? keyboardType,
   }) {
     return TextField(
       controller: controller,
       obscureText: obscure,
+      keyboardType: keyboardType,
       style: const TextStyle(color: Colors.white),
       onSubmitted: (_) => _login(),
       decoration: InputDecoration(
