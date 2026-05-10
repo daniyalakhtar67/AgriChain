@@ -57,7 +57,8 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
-  Future<void> removeFromCart(String id) async {
+  // ── FIX: Accept dynamic id (int or String) — pass raw value to .eq() ──
+  Future<void> removeFromCart(dynamic id) async {
     try {
       await supabase.from('farmer_cart').delete().eq('id', id);
       fetchCart();
@@ -121,14 +122,18 @@ class _CartScreenState extends State<CartScreen> {
 
     try {
       for (final item in cartItems) {
-        final productId  = item['product_id']?.toString().trim() ?? '';
-        final orderedQty = int.tryParse(item['quantity'].toString()) ?? 1;
+        // ── FIX: use raw product_id value (may be int) for .eq() ──
+        final rawProductId = item['product_id'];
+        final productIdStr = rawProductId?.toString().trim() ?? '';
+        final orderedQty = (item['quantity'] is int)
+            ? item['quantity'] as int
+            : int.tryParse(item['quantity'].toString()) ?? 1;
 
-        // ── FIX #5: Duplicate guard — same product ordered in last 30 secs ──
+        // Duplicate guard
         final recent = await supabase
             .from('orders')
             .select('id')
-            .eq('product_id', productId)
+            .eq('product_id', productIdStr)
             .eq('buyer_phone', _phoneC.text.trim())
             .gte(
           'created_at',
@@ -138,11 +143,10 @@ class _CartScreenState extends State<CartScreen> {
         )
             .maybeSingle();
 
-        if (recent != null) continue; // skip duplicate, move to next item
+        if (recent != null) continue;
 
-        // ── Order insert ──
         await supabase.from('orders').insert({
-          'product_id'     : productId,
+          'product_id'     : productIdStr,
           'product_title'  : item['product_title'] ?? '',
           'product_price'  : item['product_price'] ?? '',
           'seller_name'    : item['seller_name'] ?? '',
@@ -159,23 +163,25 @@ class _CartScreenState extends State<CartScreen> {
           'created_at'     : DateTime.now().toIso8601String(),
         });
 
-        // ── Stock deduct ──
-        if (productId.isNotEmpty) {
+        // Stock deduct
+        if (rawProductId != null) {
           try {
+            // ── FIX: use raw int/value for .eq() ──
             final res = await supabase
                 .from('products')
                 .select('stock_quantity')
-                .filter('id', 'eq', productId)
+                .eq('id', rawProductId)
                 .maybeSingle();
 
             if (res != null && res['stock_quantity'] != null) {
-              final currentStock =
-                  int.tryParse(res['stock_quantity'].toString()) ?? 0;
+              final currentStock = (res['stock_quantity'] is int)
+                  ? res['stock_quantity'] as int
+                  : int.tryParse(res['stock_quantity'].toString()) ?? 0;
               final newStock = (currentStock - orderedQty).clamp(0, 999999);
               await supabase
                   .from('products')
                   .update({'stock_quantity': newStock})
-                  .filter('id', 'eq', productId);
+                  .eq('id', rawProductId);
             }
           } catch (stockErr) {
             debugPrint('⚠️ Stock deduct error: $stockErr');
@@ -191,7 +197,6 @@ class _CartScreenState extends State<CartScreen> {
         _accNumberC.clear();
       });
 
-      // ── FIX #6: Order Confirmation Dialog ──
       if (mounted) {
         showDialog(
           context: context,
@@ -353,6 +358,7 @@ class _CartScreenState extends State<CartScreen> {
                     child: Column(
                       children: [
                         // ── Cart Items ──
+                        // ── FIX: pass raw id (int/dynamic) directly ──
                         ...cartItems.map((item) => _CartItem(
                           item: item,
                           onRemove: () =>
@@ -465,9 +471,6 @@ class _CartScreenState extends State<CartScreen> {
                                         color: Colors.white24),
                                     const SizedBox(height: 12),
 
-                                    // FIX #7: PaymentSelector
-                                    // directly uses setState — no
-                                    // StatefulBuilder needed
                                     Container(
                                       padding:
                                       const EdgeInsets.all(
@@ -606,7 +609,11 @@ class _CartItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    int qty = item['quantity'] ?? 1;
+    // ── FIX: safely parse quantity whether it's int or String ──
+    int qty = (item['quantity'] is int)
+        ? item['quantity'] as int
+        : int.tryParse(item['quantity']?.toString() ?? '1') ?? 1;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -651,7 +658,7 @@ class _CartItem extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           fontSize: 13)),
                   const SizedBox(height: 2),
-                  Text(item['product_price'] ?? '',
+                  Text(item['product_price']?.toString() ?? '',
                       style: GoogleFonts.poppins(
                           color: Colors.greenAccent,
                           fontSize: 12,

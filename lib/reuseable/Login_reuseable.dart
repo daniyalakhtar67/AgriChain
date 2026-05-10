@@ -144,7 +144,8 @@ import 'package:flutter/material.dart';
         final route = switch (widget.role) {
           'farmer'     => MaterialPageRoute(builder: (_) => FarmerDashboard(farmerName: name)),
           'buyer'      => MaterialPageRoute(builder: (_) => BuyerDashboard(buyerName: name)),
-          'shopkeeper' => MaterialPageRoute(builder: (_) => ShopkeeperDashboard(userId: 'userId', shopkeeperName: 'shopkeeperName')),
+        // ✅ FIXED
+          'shopkeeper' => MaterialPageRoute(builder: (_) => ShopkeeperDashboard(userId: UserSession.id, shopkeeperName: name)),
           _            => null,
         };
 

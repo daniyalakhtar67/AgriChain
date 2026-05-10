@@ -27,6 +27,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
   int _selectedQty = 1;
   int _maxStock = 0;
 
+  // ── FIX: keep raw value (int) for .eq() calls, use toString() only for display/insert ──
+  dynamic get _rawId => widget.product['item_id'] ?? widget.product['id'];
+  String get _productIdStr => _rawId?.toString().trim() ?? '';
+
   @override
   void initState() {
     super.initState();
@@ -36,9 +40,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     _fadeCtrl.forward();
 
     final stock = widget.product['stock_quantity'];
-    _maxStock = (stock != null && int.tryParse(stock.toString()) != null)
-        ? int.parse(stock.toString())
-        : 0;
+    _maxStock = (stock is int)
+        ? stock
+        : int.tryParse(stock?.toString() ?? '0') ?? 0;
   }
 
   @override
@@ -57,14 +61,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
       return;
     }
     try {
+      // ── FIX: store product_id as String in cart for orders table compatibility ──
       await supabase.from('farmer_cart').insert({
-        'product_id': widget.product['id'],
-        'product_title': widget.product['title'],
-        'product_price': widget.product['price'],
+        'product_id'   : _productIdStr,
+        'product_title': widget.product['name'] ?? widget.product['title'] ?? '',
+        'product_price': widget.product['price']?.toString() ?? '',
         'product_image': widget.product['image_url'],
-        'seller_name': widget.product['seller_name'],
-        'seller_type': widget.product['seller_type'],
-        'quantity': _selectedQty,
+        'seller_name'  : widget.product['seller_name'] ?? '',
+        'seller_type'  : widget.product['seller_type'] ?? 'shopkeeper',
+        'quantity'     : _selectedQty,
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -128,8 +133,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
   }
 
   Future<void> _openWhatsApp() async {
-    final title = widget.product['title'] ?? 'this product';
-    final price = widget.product['price'] ?? 'N/A';
+    final title = widget.product['name'] ?? widget.product['title'] ?? 'this product';
+    final price = widget.product['price']?.toString() ?? 'N/A';
     final sellerPhone = widget.product['seller_phone'] ?? '';
     final message = Uri.encodeComponent(
         'Hello! I am interested in "$title" priced at $price. I want to order $_selectedQty unit(s).');
@@ -166,9 +171,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     final p = widget.product;
     final bool isOutOfStock = _maxStock <= 0;
 
-    // Parse multi-payment methods (supports both new JSON and legacy fields)
-    final List<Map<String, String>> paymentMethods =
-    parsePaymentMethods(p);
+    // ── FIX: use 'name' from view, fallback to 'title' ──
+    final String displayTitle = p['name'] ?? p['title'] ?? '';
+    final String displayPrice = p['price']?.toString() ?? '';
+    final String displayCategory = p['category_name'] ?? p['category'] ?? '';
+    final String displayLocation = p['seller_location'] ?? p['location'] ?? '';
+    final String displayDescription = p['description'] ?? 'No description available.';
+
+    final List<Map<String, String>> paymentMethods = parsePaymentMethods(p);
 
     return Column(
       children: [
@@ -183,7 +193,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                 onPressed: () => Navigator.pop(context),
               ),
               Expanded(
-                child: Text(p['title'] ?? '',
+                child: Text(displayTitle,
                     style: GoogleFonts.poppins(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -234,7 +244,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Flexible(
-                        child: Text(p['title'] ?? '',
+                        child: Text(displayTitle,
                             style: GoogleFonts.poppins(
                                 fontSize: 22,
                                 fontWeight: FontWeight.bold,
@@ -247,7 +257,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: Colors.greenAccent),
                       ),
-                      child: Text(p['price'] ?? '',
+                      child: Text(displayPrice,
                           style: GoogleFonts.poppins(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -264,7 +274,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                       decoration: BoxDecoration(
                           color: Colors.green.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(20)),
-                      child: Text(p['category'] ?? '',
+                      child: Text(displayCategory,
                           style: GoogleFonts.poppins(
                               color: Colors.greenAccent, fontSize: 12)),
                     ),
@@ -272,7 +282,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                     const Icon(Icons.location_on,
                         color: Colors.white54, size: 14),
                     Flexible(
-                        child: Text(p['location'] ?? '',
+                        child: Text(displayLocation,
                             style: GoogleFonts.poppins(
                                 color: Colors.white54, fontSize: 12))),
                   ],
@@ -290,9 +300,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                 _infoCard(
                     icon: Icons.description_outlined,
                     title: 'Description',
-                    value: p['description'] ?? 'No description available.'),
+                    value: displayDescription),
                 const SizedBox(height: 10),
-                // ── Multi-payment card ──
                 _multiPaymentCard(paymentMethods),
                 const SizedBox(height: 10),
                 _sellerCard(p),
@@ -372,7 +381,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     );
   }
 
-  // ── Multi-payment display card ────────────────────────────────────────────
   Widget _multiPaymentCard(List<Map<String, String>> methods) {
     if (methods.isEmpty) {
       return _infoCard(
@@ -444,7 +452,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Method name badge
           Container(
             padding:
             const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -804,6 +811,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
   }
 
   Widget _sellerCard(Map<String, dynamic> p) {
+    final String sellerName = p['seller_name'] ?? 'N/A';
+    final String location = p['seller_location'] ?? p['location'] ?? 'N/A';
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: BackdropFilter(
@@ -830,11 +840,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                         fontWeight: FontWeight.bold)),
               ]),
               const SizedBox(height: 10),
-              _sellerRow(Icons.person_outline, 'Name',
-                  p['seller_name'] ?? 'N/A'),
+              _sellerRow(Icons.person_outline, 'Name', sellerName),
               const SizedBox(height: 6),
-              _sellerRow(Icons.location_on_outlined, 'Location',
-                  p['location'] ?? 'N/A'),
+              _sellerRow(Icons.location_on_outlined, 'Location', location),
             ],
           ),
         ),
@@ -883,13 +891,17 @@ class BuyNowScreen extends StatefulWidget {
 class _BuyNowScreenState extends State<BuyNowScreen> {
   final supabase = Supabase.instance.client;
 
-  final nameC = TextEditingController();
-  final phoneC = TextEditingController();
+  final nameC    = TextEditingController();
+  final phoneC   = TextEditingController();
   final addressC = TextEditingController();
   final _accNumberC = TextEditingController();
 
   String? _selectedPaymentId;
   bool _placing = false;
+
+  // ── FIX: raw value for .eq(), string for insert/orders ──
+  dynamic get _rawId => widget.product['item_id'] ?? widget.product['id'];
+  String get _productIdStr => _rawId?.toString().trim() ?? '';
 
   @override
   void dispose() {
@@ -931,44 +943,48 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
     setState(() => _placing = true);
 
     try {
+      final String displayTitle = widget.product['name'] ?? widget.product['title'] ?? '';
+      final String displayPrice = widget.product['price']?.toString() ?? '';
+      final String sellerName   = widget.product['seller_name'] ?? '';
+      final String sellerType   = widget.product['seller_type'] ?? 'shopkeeper';
+
       await supabase.from('orders').insert({
-        'product_id': widget.product['id']?.toString().trim() ?? '',
-        'product_title': widget.product['title'] ?? '',
-        'product_price': widget.product['price'] ?? '',
-        'seller_name': widget.product['seller_name'] ?? '',
-        'seller_type':
-        widget.product['seller_type'] ?? 'shopkeeper',
-        'buyer_name': nameC.text.trim(),
-        'buyer_phone': phoneC.text.trim(),
-        'buyer_address': addressC.text.trim(),
-        'payment_method': selectedMethod.name,
+        'product_id'     : _productIdStr,
+        'product_title'  : displayTitle,
+        'product_price'  : displayPrice,
+        'seller_name'    : sellerName,
+        'seller_type'    : sellerType,
+        'buyer_name'     : nameC.text.trim(),
+        'buyer_phone'    : phoneC.text.trim(),
+        'buyer_address'  : addressC.text.trim(),
+        'payment_method' : selectedMethod.name,
         'payment_account': selectedMethod.requiresAccount
             ? _accNumberC.text.trim()
             : null,
-        'quantity': widget.selectedQty,
-        'status': 'pending',
-        'created_at': DateTime.now().toIso8601String(),
+        'quantity'       : widget.selectedQty,
+        'status'         : 'pending',
+        'created_at'     : DateTime.now().toIso8601String(),
       });
 
-      final productId =
-          widget.product['id']?.toString().trim() ?? '';
+      // ── Stock deduct using raw int id ──
       int newStock = 0;
-      if (productId.isNotEmpty) {
+      if (_rawId != null) {
         try {
           final res = await supabase
               .from('products')
               .select('stock_quantity')
-              .filter('id', 'eq', productId)
+              .eq('item_id', _rawId)
               .maybeSingle();
           if (res != null && res['stock_quantity'] != null) {
-            final currentStock =
-                int.tryParse(res['stock_quantity'].toString()) ?? 0;
+            final currentStock = (res['stock_quantity'] is int)
+                ? res['stock_quantity'] as int
+                : int.tryParse(res['stock_quantity'].toString()) ?? 0;
             newStock =
                 (currentStock - widget.selectedQty).clamp(0, 999999);
             await supabase
                 .from('products')
-                .update({'stock_quantity': newStock}).filter(
-                'id', 'eq', productId);
+                .update({'stock_quantity': newStock})
+                .eq('item_id', _rawId);
           }
         } catch (stockErr) {
           debugPrint('Stock deduct error: $stockErr');
@@ -1010,8 +1026,9 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
   @override
   Widget build(BuildContext context) {
     final p = widget.product;
-    final List<Map<String, String>> sellerMethods =
-    parsePaymentMethods(p);
+    final String displayTitle = p['name'] ?? p['title'] ?? '';
+    final String displayPrice = p['price']?.toString() ?? '';
+    final List<Map<String, String>> sellerMethods = parsePaymentMethods(p);
 
     return Scaffold(
       body: Stack(
@@ -1086,14 +1103,14 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
                                   crossAxisAlignment:
                                   CrossAxisAlignment.start,
                                   children: [
-                                    Text(p['title'] ?? '',
+                                    Text(displayTitle,
                                         style: GoogleFonts.poppins(
                                             color: Colors.white,
                                             fontWeight:
                                             FontWeight.bold,
                                             fontSize: 15)),
                                     const SizedBox(height: 4),
-                                    Text(p['price'] ?? '',
+                                    Text(displayPrice,
                                         style: GoogleFonts.poppins(
                                             color:
                                             Colors.greenAccent,
@@ -1134,7 +1151,6 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
 
                         const SizedBox(height: 16),
 
-                        // ── Seller Accepted Methods Reference ──
                         if (sellerMethods.isNotEmpty) ...[
                           Container(
                             padding: const EdgeInsets.all(14),
@@ -1173,7 +1189,6 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
                                       _sellerMethodBadge(m))
                                       .toList(),
                                 ),
-                                // Show accounts below badges
                                 ...sellerMethods
                                     .where((m) =>
                                 m['account'] != null &&
@@ -1186,7 +1201,6 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
                           const SizedBox(height: 16),
                         ],
 
-                        // Buyer Details
                         Text('Enter Your Details',
                             style: GoogleFonts.poppins(
                                 color: Colors.yellow,

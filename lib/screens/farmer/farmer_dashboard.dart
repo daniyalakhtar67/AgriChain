@@ -23,6 +23,9 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
   final supabase = Supabase.instance.client;
   final searchController = TextEditingController();
 
+  // ── FIX 1: mutable copy of farmerName so UI can update after edit ──
+  late String _farmerName;
+
   List<Map<String, dynamic>> allProducts = [];
   List<Map<String, dynamic>> filteredProducts = [];
   bool isLoading = true;
@@ -33,6 +36,9 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
   @override
   void initState() {
     super.initState();
+    // ── FIX 1: initialise mutable name from widget param ──
+    _farmerName = widget.farmerName;
+
     fetchShopkeeperProducts();
     searchController.addListener(_onSearch);
     _reloadCrops();
@@ -49,7 +55,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
       _cropsFuture = supabase
           .from('view_farmer_items')
           .select()
-          .eq('seller_name', widget.farmerName)
+          .eq('seller_name', _farmerName)           // ── uses mutable name ──
           .order('listed_date', ascending: false)
           .then((data) => List<Map<String, dynamic>>.from(data));
     });
@@ -392,8 +398,6 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                       itemBuilder: (context, index) {
                         final crop = crops[index];
 
-                        // ✅ Fix: new view uses 'quantity' as text e.g. '100 kg'
-                        // Parse number from the quantity string
                         final qtyRaw = crop['quantity']?.toString() ?? '0';
                         final kgVal = double.tryParse(
                             qtyRaw.replaceAll(RegExp(r'[^0-9.]'), '')) ??
@@ -432,7 +436,6 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                                     : const Icon(Icons.grass,
                                     color: Colors.green),
                               ),
-                              // ✅ Fix: 'name' not 'title'
                               title: Text(crop['name'] ?? '',
                                   style: GoogleFonts.poppins(
                                       color: Colors.white,
@@ -440,14 +443,12 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                               subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // ✅ Fix: 'category_name' not 'category'
                                   Text(
                                       '${crop['category_name'] ?? ''} • Rs. ${crop['price'] ?? ''}',
                                       style: GoogleFonts.poppins(
                                           color: Colors.white70,
                                           fontSize: 12)),
                                   const SizedBox(height: 4),
-                                  // ✅ Fix: 'payment_method' still exists in view
                                   if (crop['payment_method'] != null &&
                                       crop['payment_method']
                                           .toString()
@@ -494,9 +495,8 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                               trailing: IconButton(
                                 icon: const Icon(Icons.delete,
                                     color: Colors.redAccent),
-                                // ✅ Fix: 'item_id' not 'id'
                                 onPressed: () => _deleteCrop(
-                                    crop['item_id'].toString()),
+                                    crop['item_id']),
                               ),
                             ),
                           ),
@@ -569,7 +569,8 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                   const Icon(Icons.person, color: Colors.green, size: 48),
                 ),
                 const SizedBox(height: 14),
-                Text(widget.farmerName,
+                // ── FIX 1: show _farmerName (mutable) instead of widget.farmerName ──
+                Text(_farmerName,
                     style: GoogleFonts.poppins(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
@@ -591,10 +592,11 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                           fontWeight: FontWeight.w600)),
                 ),
                 const SizedBox(height: 28),
+                // ── FIX 1: use _farmerName in info cards ──
                 _profileInfoCard(
                   icon: Icons.person_outline,
                   label: 'Name',
-                  value: widget.farmerName,
+                  value: _farmerName,
                 ),
                 const SizedBox(height: 12),
                 _profileInfoCard(
@@ -687,46 +689,98 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
     );
   }
 
+  // ── FIX 2: Edit profile dialog — writes to Supabase and updates UI ──
   void _showEditProfileDialog() {
-    final nameC = TextEditingController(text: widget.farmerName);
+    final nameC = TextEditingController(text: _farmerName);
+    bool saving = false;
+
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: Colors.grey.shade900,
-        shape:
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Edit Profile',
-            style: GoogleFonts.poppins(
-                color: Colors.yellow, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _dialogField('Name', nameC, Icons.person_outline,
-                accentColor: Colors.yellow),
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) => AlertDialog(
+          backgroundColor: Colors.grey.shade900,
+          shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text('Edit Profile',
+              style: GoogleFonts.poppins(
+                  color: Colors.yellow, fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _dialogField('Name', nameC, Icons.person_outline,
+                  accentColor: Colors.yellow),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(dialogCtx),
+              child: Text('Cancel',
+                  style: GoogleFonts.poppins(color: Colors.white60)),
+            ),
+            ElevatedButton(
+              style:
+              ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              onPressed: saving
+                  ? null
+                  : () async {
+                final newName = nameC.text.trim();
+                if (newName.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Name cannot be empty!'),
+                        backgroundColor: Colors.red),
+                  );
+                  return;
+                }
+
+                setDialogState(() => saving = true);
+
+                try {
+                  // ── FIX 2: update the users table in Supabase ──
+                  await supabase
+                      .from('users')
+                      .update({'name': newName})
+                      .eq('user_id', UserSession.id);
+
+                  // ── FIX 1+2: update mutable state so UI re-renders ──
+                  if (mounted) {
+                    setState(() => _farmerName = newName);
+                    // also reload crops query which uses _farmerName
+                    _reloadCrops();
+                  }
+
+                  if (mounted) Navigator.pop(dialogCtx);
+
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Profile Updated! ✅'),
+                          backgroundColor: Colors.green),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text('Error updating profile: $e'),
+                          backgroundColor: Colors.red),
+                    );
+                  }
+                } finally {
+                  if (mounted) setDialogState(() => saving = false);
+                }
+              },
+              child: saving
+                  ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      color: Colors.white, strokeWidth: 2))
+                  : Text('Save',
+                  style: GoogleFonts.poppins(color: Colors.white)),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel',
-                style: GoogleFonts.poppins(color: Colors.white60)),
-          ),
-          ElevatedButton(
-            style:
-            ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            onPressed: () async {
-              Navigator.pop(context);
-              setState(() {});
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Profile Updated! ✅'),
-                    backgroundColor: Colors.green),
-              );
-            },
-            child: Text('Save',
-                style: GoogleFonts.poppins(color: Colors.white)),
-          ),
-        ],
       ),
     );
   }
@@ -836,11 +890,10 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
 
                   setS(() => saving = true);
                   try {
-                    // ── Step 1: Get farmer's user_id ──
                     final userRes = await supabase
                         .from('users')
                         .select('user_id')
-                        .eq('name', widget.farmerName)
+                        .eq('name', _farmerName)     // ── uses mutable name ──
                         .maybeSingle();
 
                     if (userRes == null) {
@@ -848,7 +901,6 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                     }
                     final userId = userRes['user_id'];
 
-                    // ── Step 2: Get Crops category_id ──
                     final catRes = await supabase
                         .from('categories')
                         .select('category_id')
@@ -857,11 +909,6 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
 
                     final categoryId = catRes?['category_id'];
 
-                    // ── Step 3: Build payment method string ──
-                    final firstMethod = kPaymentMethods.firstWhere(
-                            (m) => m.id == selectedPaymentIds.first);
-
-                    // ── Step 4: Insert into items ──
                     final itemRes = await supabase
                         .from('items')
                         .insert({
@@ -887,7 +934,6 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
 
                     final itemId = itemRes['item_id'];
 
-                    // ── Step 5: Insert into crops ──
                     await supabase.from('crops').insert({
                       'item_id'  : itemId,
                       'user_id'  : userId,
@@ -929,9 +975,8 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
     );
   }
 
-  Future<void> _deleteCrop(String itemId) async {
+  Future<void> _deleteCrop(dynamic itemId) async {
     try {
-      // ✅ Fix: delete from items table using item_id (cascades to crops)
       await supabase.from('items').delete().eq('item_id', itemId);
       _reloadCrops();
       if (mounted) {
@@ -995,22 +1040,22 @@ class _ProductCardState extends State<_ProductCard> {
   bool _adding = false;
   late int _stockVal;
 
-  // ✅ Fix: new view uses 'name', 'category_name', 'seller_name', 'seller_location'
   String get _title    => widget.product['name']           ?? '';
   String get _price    => widget.product['price']?.toString() ?? '';
   String get _location => widget.product['seller_location'] ?? '';
   String get _category => widget.product['category_name']  ?? '';
   String get _imageUrl => widget.product['image_url']      ?? '';
   String get _seller   => widget.product['seller_name']    ?? '';
-  String get _itemId   => widget.product['item_id']?.toString() ?? '';
+
+  dynamic get _rawItemId => widget.product['item_id'];
 
   @override
   void initState() {
     super.initState();
     final stock = widget.product['stock_quantity'];
-    _stockVal = (stock != null && int.tryParse(stock.toString()) != null)
-        ? int.parse(stock.toString())
-        : 0;
+    _stockVal = (stock is int)
+        ? stock
+        : int.tryParse(stock?.toString() ?? '0') ?? 0;
   }
 
   Future<void> _addToCart() async {
@@ -1025,15 +1070,15 @@ class _ProductCardState extends State<_ProductCard> {
 
     setState(() => _adding = true);
     try {
-      // ✅ Fix: check stock from items/products table using item_id
       final res = await supabase
           .from('products')
           .select('stock_quantity')
-          .eq('item_id', _itemId)
+          .eq('item_id', _rawItemId)
           .maybeSingle();
 
-      final liveStock =
-          int.tryParse(res?['stock_quantity']?.toString() ?? '0') ?? 0;
+      final liveStock = (res?['stock_quantity'] is int)
+          ? res!['stock_quantity'] as int
+          : int.tryParse(res?['stock_quantity']?.toString() ?? '0') ?? 0;
 
       if (liveStock <= 0) {
         if (mounted) {
@@ -1050,12 +1095,11 @@ class _ProductCardState extends State<_ProductCard> {
         return;
       }
 
-      // ✅ Fix: cart uses item_id column
       final existing = await supabase
           .from('carts')
           .select('cart_id, quantity')
           .eq('user_id', UserSession.id)
-          .eq('item_id', _itemId)
+          .eq('item_id', _rawItemId)
           .maybeSingle();
 
       if (existing != null) {
@@ -1067,7 +1111,7 @@ class _ProductCardState extends State<_ProductCard> {
       } else {
         await supabase.from('carts').insert({
           'user_id' : UserSession.id,
-          'item_id' : _itemId,
+          'item_id' : _rawItemId,
           'quantity': 1,
         });
       }
@@ -1124,16 +1168,16 @@ class _ProductCardState extends State<_ProductCard> {
             MaterialPageRoute(
                 builder: (_) =>
                     ProductDetailScreen(product: widget.product)));
-        // ✅ Fix: refresh using item_id from products table
         final res = await supabase
             .from('products')
             .select('stock_quantity')
-            .eq('item_id', _itemId)
+            .eq('item_id', _rawItemId)
             .maybeSingle();
         if (res != null && mounted) {
           setState(() {
-            _stockVal =
-                int.tryParse(res['stock_quantity'].toString()) ?? 0;
+            _stockVal = (res['stock_quantity'] is int)
+                ? res['stock_quantity'] as int
+                : int.tryParse(res['stock_quantity'].toString()) ?? 0;
           });
         }
       },
