@@ -37,6 +37,19 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
   double _availableKg = 0;
   double _selectedKg  = 1;
 
+  // ── Safe helpers — all view columns are correctly named here ──
+  String get _name        => widget.product['name']?.toString()           ?? '';
+  String get _priceStr    => widget.product['price']?.toString()          ?? '0';
+  double get _priceDouble => double.tryParse(_priceStr)                   ?? 0;
+  String get _priceLabel  => 'Rs. $_priceStr';
+  String get _category    => widget.product['category_name']?.toString()  ?? '';
+  String get _location    => widget.product['seller_location']?.toString() ?? '';
+  String get _sellerName  => widget.product['seller_name']?.toString()    ?? 'N/A';
+  String get _sellerPhone => widget.product['seller_phone']?.toString()   ?? '';
+  String get _description => widget.product['description']?.toString()    ?? 'No description available.';
+  String get _imageUrl    => widget.product['image_url']?.toString()      ?? '';
+  String get _paymentMethod => widget.product['payment_method']?.toString() ?? '';
+
   @override
   void initState() {
     super.initState();
@@ -45,10 +58,10 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
     _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeIn);
     _fadeCtrl.forward();
 
-    final kgRaw = widget.product['stock_quantity'];
-    _availableKg = (kgRaw != null && double.tryParse(kgRaw.toString()) != null)
-        ? double.parse(kgRaw.toString())
-        : 0;
+    // For crops: quantity is a text like "1000 kg" — parse the number
+    final qtyRaw = widget.product['quantity']?.toString() ?? '0';
+    _availableKg = double.tryParse(
+        qtyRaw.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
     _selectedKg = _availableKg > 0 ? 1 : 0;
   }
 
@@ -116,7 +129,6 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
   }
 
   Future<void> _placeOrder() async {
-    // ── Validation ──
     if (_nameC.text.trim().isEmpty ||
         _phoneC.text.trim().isEmpty ||
         _addressC.text.trim().isEmpty) {
@@ -168,28 +180,24 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
           ? double.tryParse(_qtyC.text.trim()) ?? _selectedKg
           : _selectedKg;
 
-      // ── FIX: new orders schema with user_id, total_amount, net_amount ──
+      final totalAmount = _priceDouble * _selectedKg;
+
       final orderResult = await supabase
           .from('orders')
           .insert({
         'user_id'     : UserSession.id,
-        'total_amount': (double.tryParse(
-            widget.product['price']?.toString() ?? '0') ?? 0) *
-            _selectedKg,
-        'net_amount'  : (double.tryParse(
-            widget.product['price']?.toString() ?? '0') ?? 0) *
-            _selectedKg,
+        'total_amount': totalAmount,
+        'net_amount'  : totalAmount,
         'status'      : 'placed',
       })
           .select('order_id')
           .single();
 
-      // ── FIX: insert into order_items with the returned order_id ──
       await supabase.from('order_items').insert({
         'order_id': orderResult['order_id'],
         'item_id' : widget.product['item_id'],
         'quantity': orderQty.toInt() > 0 ? orderQty.toInt() : 1,
-        'price'   : widget.product['price'],
+        'price'   : _priceDouble,
       });
 
       setState(() { _placing = false; _step = 2; });
@@ -203,12 +211,10 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
   }
 
   Future<void> _openWhatsApp() async {
-    final title = widget.product['title'] ?? 'this product';
-    final price = widget.product['price'] ?? 'N/A';
-    final sellerPhone = widget.product['seller_phone'] ?? '';
     final message = Uri.encodeComponent(
-        'Hello! I am interested in "$title" priced at $price. I want ${_selectedKg.toStringAsFixed(1)} KG.');
-    final cleanPhone = sellerPhone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+        'Hello! I am interested in "$_name" priced at $_priceLabel. '
+            'I want ${_selectedKg.toStringAsFixed(1)} KG.');
+    final cleanPhone = _sellerPhone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
     final Uri uri = cleanPhone.isNotEmpty
         ? Uri.parse('https://wa.me/$cleanPhone?text=$message')
         : Uri.parse('https://wa.me/?text=$message');
@@ -242,11 +248,11 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
   }
 
   Widget _buildDetailView() {
-    final p = widget.product;
     final bool isUnavailable = _availableKg <= 0;
 
     return Column(
       children: [
+        // ── App Bar ──
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
@@ -256,7 +262,7 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                 onPressed: () => Navigator.pop(context),
               ),
               Expanded(
-                child: Text(p['title'] ?? '',
+                child: Text(_name,
                     style: GoogleFonts.poppins(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -292,9 +298,9 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(20),
-                      child: p['image_url'] != null
+                      child: _imageUrl.isNotEmpty
                           ? CachedNetworkImage(
-                          imageUrl: p['image_url'],
+                          imageUrl: _imageUrl,
                           width: double.infinity,
                           height: 220,
                           fit: BoxFit.cover,
@@ -355,12 +361,12 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
 
                 const SizedBox(height: 16),
 
-                // ── Title & Price ──
+                // ── Name & Price ──
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Flexible(
-                        child: Text(p['title'] ?? '',
+                        child: Text(_name,
                             style: GoogleFonts.poppins(
                                 fontSize: 22,
                                 fontWeight: FontWeight.bold,
@@ -373,7 +379,7 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: Colors.greenAccent),
                       ),
-                      child: Text(p['price'] ?? '',
+                      child: Text(_priceLabel,
                           style: GoogleFonts.poppins(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -393,7 +399,7 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                       decoration: BoxDecoration(
                           color: Colors.green.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(20)),
-                      child: Text(p['category'] ?? '',
+                      child: Text(_category,
                           style: GoogleFonts.poppins(
                               color: Colors.greenAccent, fontSize: 12)),
                     ),
@@ -401,7 +407,7 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                     const Icon(Icons.location_on,
                         color: Colors.white54, size: 14),
                     Flexible(
-                        child: Text(p['location'] ?? '',
+                        child: Text(_location,
                             style: GoogleFonts.poppins(
                                 color: Colors.white54, fontSize: 12))),
                   ],
@@ -418,18 +424,17 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                 ],
 
                 // ── Seller Accepts ──
-                if (p['payment_method'] != null &&
-                    p['payment_method'].toString().isNotEmpty)
-                  _sellerAcceptsCard(p['payment_method']),
+                if (_paymentMethod.isNotEmpty)
+                  _sellerAcceptsCard(_paymentMethod),
 
                 const SizedBox(height: 10),
 
                 _infoCard(
                     icon: Icons.description_outlined,
                     title: 'Description',
-                    value: p['description'] ?? 'No description available.'),
+                    value: _description),
                 const SizedBox(height: 10),
-                _sellerCard(p),
+                _sellerCard(),
                 const SizedBox(height: 24),
 
                 if (!isUnavailable) ...[
@@ -509,7 +514,6 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
     );
   }
 
-  // ── Seller Accepts Card ──
   Widget _sellerAcceptsCard(String paymentMethod) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
@@ -548,12 +552,10 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                   padding: const EdgeInsets.symmetric(
                       horizontal: 12, vertical: 5),
                   decoration: BoxDecoration(
-                    color: Colors.lightBlueAccent
-                        .withValues(alpha: 0.12),
+                    color: Colors.lightBlueAccent.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                        color: Colors.lightBlueAccent
-                            .withValues(alpha: 0.5)),
+                        color: Colors.lightBlueAccent.withValues(alpha: 0.5)),
                   ),
                   child: Text(m.trim(),
                       style: GoogleFonts.poppins(
@@ -600,11 +602,8 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  isUnavailable
-                      ? Icons.cancel_outlined
-                      : Icons.scale_outlined,
-                  color:
-                  isUnavailable ? Colors.redAccent : Colors.greenAccent,
+                  isUnavailable ? Icons.cancel_outlined : Icons.scale_outlined,
+                  color: isUnavailable ? Colors.redAccent : Colors.greenAccent,
                   size: 24,
                 ),
               ),
@@ -614,9 +613,7 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isUnavailable
-                          ? 'Currently Unavailable'
-                          : 'Farmer Stock',
+                      isUnavailable ? 'Currently Unavailable' : 'Farmer Stock',
                       style: GoogleFonts.poppins(
                           color: Colors.white54,
                           fontSize: 11,
@@ -798,10 +795,11 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
     );
   }
 
-  Widget _infoCard(
-      {required IconData icon,
-        required String title,
-        required String value}) {
+  Widget _infoCard({
+    required IconData icon,
+    required String title,
+    required String value,
+  }) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: BackdropFilter(
@@ -841,7 +839,7 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
     );
   }
 
-  Widget _sellerCard(Map<String, dynamic> p) {
+  Widget _sellerCard() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: BackdropFilter(
@@ -869,14 +867,13 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                 ],
               ),
               const SizedBox(height: 10),
-              _sellerRow(Icons.person_outline, 'Name',
-                  p['seller_name'] ?? 'N/A'),
+              _sellerRow(Icons.person_outline, 'Name', _sellerName),
               const SizedBox(height: 6),
-              _sellerRow(Icons.badge_outlined, 'CNIC',
-                  p['seller_cnic'] ?? 'N/A'),
+              _sellerRow(Icons.phone_outlined, 'Phone',
+                  _sellerPhone.isNotEmpty ? _sellerPhone : 'N/A'),
               const SizedBox(height: 6),
               _sellerRow(Icons.location_on_outlined, 'Location',
-                  p['location'] ?? 'N/A'),
+                  _location.isNotEmpty ? _location : 'N/A'),
             ],
           ),
         ),
@@ -910,8 +907,7 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
           child: Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new,
-                    color: Colors.white),
+                icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
                 onPressed: () {
                   setState(() => _step = 0);
                   _fadeCtrl..reset()..forward();
@@ -944,9 +940,9 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(10),
-                        child: widget.product['image_url'] != null
+                        child: _imageUrl.isNotEmpty
                             ? CachedNetworkImage(
-                            imageUrl: widget.product['image_url'],
+                            imageUrl: _imageUrl,
                             width: 64,
                             height: 64,
                             fit: BoxFit.cover,
@@ -968,13 +964,13 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(widget.product['title'] ?? '',
+                            Text(_name,
                                 style: GoogleFonts.poppins(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15)),
                             const SizedBox(height: 4),
-                            Text(widget.product['price'] ?? '',
+                            Text(_priceLabel,
                                 style: GoogleFonts.poppins(
                                     color: Colors.greenAccent,
                                     fontWeight: FontWeight.w600,
@@ -1014,11 +1010,9 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                         fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
 
-                // ── Name ──
                 _formField('Your Name', _nameC, Icons.person_outline),
                 const SizedBox(height: 12),
 
-                // ── Phone — max 11 digits ──
                 TextField(
                   controller: _phoneC,
                   keyboardType: TextInputType.phone,
@@ -1045,13 +1039,11 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                 ),
                 const SizedBox(height: 12),
 
-                // ── Address ──
                 _formField('Delivery Address', _addressC,
                     Icons.location_on_outlined,
                     maxLines: 3),
                 const SizedBox(height: 20),
 
-                // ── Payment Method Selector ──
                 ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: BackdropFilter(
@@ -1076,7 +1068,6 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
 
                 const SizedBox(height: 24),
 
-                // ── Place Order Button ──
                 SizedBox(
                   width: double.infinity,
                   height: 54,
@@ -1174,9 +1165,9 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
                       border: Border.all(color: Colors.white24)),
                   child: Column(
                     children: [
-                      _summaryRow('Product', widget.product['title'] ?? ''),
+                      _summaryRow('Product', _name),
                       const SizedBox(height: 8),
-                      _summaryRow('Price', widget.product['price'] ?? ''),
+                      _summaryRow('Price', _priceLabel),
                       const SizedBox(height: 8),
                       _summaryRow('Quantity',
                           '${_selectedKg.toStringAsFixed(1)} KG'),
@@ -1205,8 +1196,7 @@ class _BuyerProductDetailState extends State<BuyerProductDetail>
               child: ElevatedButton.icon(
                 onPressed: () =>
                     Navigator.popUntil(context, (route) => route.isFirst),
-                icon:
-                const Icon(Icons.home_outlined, color: Colors.white),
+                icon: const Icon(Icons.home_outlined, color: Colors.white),
                 label: Text('Back to Dashboard',
                     style: GoogleFonts.poppins(
                         color: Colors.white,

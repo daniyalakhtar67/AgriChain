@@ -881,7 +881,6 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                           ? null
                           : imageC.text.trim(),
                       'status'     : 'active',
-                      'payment_method': firstMethod.name,
                     })
                         .select('item_id')
                         .single();
