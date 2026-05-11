@@ -1,5 +1,5 @@
   import 'package:argichain/services/user_session.dart';
-import 'package:flutter/material.dart';
+  import 'package:flutter/material.dart';
   import 'package:flutter/services.dart';
   import 'package:google_fonts/google_fonts.dart';
   import 'dart:ui';
@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
   import 'package:argichain/screens/shopkeeper/shopkeeper_dashboard.dart';
 
   class ReusableLogin extends StatefulWidget {
-    // Variable set at runtime
     final String title;
     final String imagePath;
     final Widget registerPage;
@@ -22,7 +21,7 @@ import 'package:flutter/material.dart';
       required this.imagePath,
       required this.registerPage,
       required this.dashboardPage,
-      required this.role,
+       required this.role,
     });
 
     @override
@@ -117,15 +116,13 @@ import 'package:flutter/material.dart';
           return;
         }
 
-        // Step 2: confirm role
         final userId = userResult['user_id'];
         final roleTable = widget.role == 'farmer' ? 'farmers'
             : widget.role == 'buyer'  ? 'buyers'
             : 'shopkeepers';
 
         final roleCheck = await Supabase.instance.client
-            .from(roleTable)
-            .select('user_id')
+            .from(roleTable).select('user_id')
             .eq('user_id', userId)
             .maybeSingle();
 

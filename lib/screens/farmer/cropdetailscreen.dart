@@ -17,13 +17,16 @@ class _CropDetailScreenState extends State<CropDetailScreen> {
   late double _kgQty;
   bool _saving = false;
 
+  // ── FIX: use item_id (UUID) from view_farmer_items ──
+  dynamic get _rawId => widget.crop['item_id'];
+
   @override
   void initState() {
     super.initState();
-    final raw = widget.crop['crop_quantity_kg'];
-    _kgQty = (raw != null && double.tryParse(raw.toString()) != null)
-        ? double.parse(raw.toString())
-        : 0.0;
+    // ── FIX: parse quantity from 'quantity' field e.g. "500 maund" or "100 kg" ──
+    final raw = widget.crop['quantity']?.toString() ?? '0';
+    final numericStr = raw.replaceAll(RegExp(r'[^0-9.]'), '');
+    _kgQty = double.tryParse(numericStr) ?? 0.0;
   }
 
   String get _stockLabel {
@@ -41,11 +44,16 @@ class _CropDetailScreenState extends State<CropDetailScreen> {
   }
 
   Future<void> _updateQty(double newQty) async {
+    if (_rawId == null) return;
     setState(() => _saving = true);
     try {
+      // ── FIX: update items.quantity (text field) using item_id ──
+      final unit = widget.crop['unit']?.toString() ?? 'kg';
       await supabase
-          .from('products')
-          .update({'crop_quantity_kg': newQty}).eq('id', widget.crop['id']);
+          .from('items')
+          .update({'quantity': '${newQty.toStringAsFixed(0)} $unit'})
+          .eq('item_id', _rawId);
+
       setState(() {
         _kgQty = newQty;
         _saving = false;
@@ -82,7 +90,7 @@ class _CropDetailScreenState extends State<CropDetailScreen> {
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
-            labelText: 'Enter KG amount',
+            labelText: 'Enter amount',
             labelStyle: GoogleFonts.poppins(color: Colors.yellow),
             prefixIcon: const Icon(Icons.scale_outlined, color: Colors.yellow),
             enabledBorder: OutlineInputBorder(
@@ -129,6 +137,16 @@ class _CropDetailScreenState extends State<CropDetailScreen> {
   Widget build(BuildContext context) {
     final p = widget.crop;
 
+    // ── FIX: use correct field names from view_farmer_items ──
+    final String displayTitle    = p['name']            ?? '';
+    final String displayPrice    = p['price']?.toString() ?? '';
+    final String displayCategory = p['category_name']   ?? '';
+    final String displayLocation = p['seller_location'] ?? p['location'] ?? '';
+    final String displayDesc     = p['description']     ?? 'No description available.';
+    final String displayPayment  = p['payment_method']  ?? 'Not specified';
+    final String sellerName      = p['seller_name']     ?? 'N/A';
+    final String sellerPhone     = p['seller_phone']    ?? 'N/A';
+
     return Scaffold(
       body: Stack(
         children: [
@@ -160,7 +178,7 @@ class _CropDetailScreenState extends State<CropDetailScreen> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text(p['title'] ?? '',
+                        child: Text(displayTitle,
                             style: GoogleFonts.poppins(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -217,7 +235,7 @@ class _CropDetailScreenState extends State<CropDetailScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Flexible(
-                              child: Text(p['title'] ?? '',
+                              child: Text(displayTitle,
                                   style: GoogleFonts.poppins(
                                       fontSize: 22,
                                       fontWeight: FontWeight.bold,
@@ -231,7 +249,7 @@ class _CropDetailScreenState extends State<CropDetailScreen> {
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(color: Colors.greenAccent),
                               ),
-                              child: Text(p['price'] ?? '',
+                              child: Text(displayPrice,
                                   style: GoogleFonts.poppins(
                                       fontSize: 15,
                                       fontWeight: FontWeight.bold,
@@ -251,7 +269,7 @@ class _CropDetailScreenState extends State<CropDetailScreen> {
                               decoration: BoxDecoration(
                                   color: Colors.green.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(20)),
-                              child: Text(p['category'] ?? '',
+                              child: Text(displayCategory,
                                   style: GoogleFonts.poppins(
                                       color: Colors.greenAccent, fontSize: 12)),
                             ),
@@ -259,7 +277,7 @@ class _CropDetailScreenState extends State<CropDetailScreen> {
                             const Icon(Icons.location_on,
                                 color: Colors.white54, size: 14),
                             Flexible(
-                              child: Text(p['location'] ?? '',
+                              child: Text(displayLocation,
                                   style: GoogleFonts.poppins(
                                       color: Colors.white54, fontSize: 12)),
                             ),
@@ -272,15 +290,15 @@ class _CropDetailScreenState extends State<CropDetailScreen> {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(16),
                           child: BackdropFilter(
-                            filter:
-                            ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
                             child: Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(16),
-                                border:
-                                Border.all(color: Colors.lightBlueAccent.withValues(alpha: 0.4)),
+                                border: Border.all(
+                                    color: Colors.lightBlueAccent
+                                        .withValues(alpha: 0.4)),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -302,10 +320,8 @@ class _CropDetailScreenState extends State<CropDetailScreen> {
 
                                   // ── +/- controls ──
                                   Row(
-                                    mainAxisAlignment:
-                                    MainAxisAlignment.center,
+                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      // Minus button
                                       GestureDetector(
                                         onTap: _saving
                                             ? null
@@ -327,14 +343,12 @@ class _CropDetailScreenState extends State<CropDetailScreen> {
                                                     .withValues(alpha: 0.5)),
                                           ),
                                           child: const Icon(Icons.remove,
-                                              color: Colors.redAccent,
-                                              size: 24),
+                                              color: Colors.redAccent, size: 24),
                                         ),
                                       ),
 
                                       const SizedBox(width: 16),
 
-                                      // KG Display
                                       Container(
                                         width: 100,
                                         height: 52,
@@ -359,7 +373,8 @@ class _CropDetailScreenState extends State<CropDetailScreen> {
                                               : Text(
                                               _kgQty >= 1000
                                                   ? '${(_kgQty / 1000).toStringAsFixed(1)}T'
-                                                  : '${_kgQty.toStringAsFixed(0)}',
+                                                  : _kgQty
+                                                  .toStringAsFixed(0),
                                               style: GoogleFonts.poppins(
                                                   color: Colors.white,
                                                   fontSize: 22,
@@ -370,7 +385,6 @@ class _CropDetailScreenState extends State<CropDetailScreen> {
 
                                       const SizedBox(width: 16),
 
-                                      // Plus button
                                       GestureDetector(
                                         onTap: _saving
                                             ? null
@@ -397,7 +411,6 @@ class _CropDetailScreenState extends State<CropDetailScreen> {
 
                                   const SizedBox(height: 12),
 
-                                  // ── Stock Label ──
                                   Center(
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -421,7 +434,6 @@ class _CropDetailScreenState extends State<CropDetailScreen> {
 
                                   const SizedBox(height: 12),
 
-                                  // ── Custom Amount Button ──
                                   SizedBox(
                                     width: double.infinity,
                                     child: OutlinedButton.icon(
@@ -452,20 +464,18 @@ class _CropDetailScreenState extends State<CropDetailScreen> {
 
                         const SizedBox(height: 12),
 
-                        // ── Description ──
                         _infoCard(
                           icon: Icons.description_outlined,
                           title: 'Description',
-                          value: p['description'] ?? 'No description available.',
+                          value: displayDesc,
                         ),
 
                         const SizedBox(height: 10),
 
-                        // ── Payment Method ──
                         _infoCard(
                           icon: Icons.payment,
                           title: 'Payment Method',
-                          value: p['payment_method'] ?? 'Not specified',
+                          value: displayPayment,
                         ),
 
                         const SizedBox(height: 10),
@@ -474,47 +484,39 @@ class _CropDetailScreenState extends State<CropDetailScreen> {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(14),
                           child: BackdropFilter(
-                            filter:
-                            ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
                             child: Container(
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
-                                color:
-                                Colors.green.withValues(alpha: 0.10),
+                                color: Colors.green.withValues(alpha: 0.10),
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
-                                    color: Colors.green
-                                        .withValues(alpha: 0.4)),
+                                    color: Colors.green.withValues(alpha: 0.4)),
                               ),
                               child: Column(
-                                crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
                                     children: [
                                       const Icon(Icons.storefront,
-                                          color: Colors.greenAccent,
-                                          size: 18),
+                                          color: Colors.greenAccent, size: 18),
                                       const SizedBox(width: 6),
                                       Text('Seller Info',
                                           style: GoogleFonts.poppins(
                                               color: Colors.greenAccent,
                                               fontSize: 13,
-                                              fontWeight:
-                                              FontWeight.bold)),
+                                              fontWeight: FontWeight.bold)),
                                     ],
                                   ),
                                   const SizedBox(height: 10),
-                                  _sellerRow(Icons.person_outline,
-                                      'Name', p['seller_name'] ?? 'N/A'),
-                                  const SizedBox(height: 6),
-                                  _sellerRow(Icons.phone_outlined,
-                                      'Phone', p['seller_phone'] ?? 'N/A'),
+                                  _sellerRow(
+                                      Icons.person_outline, 'Name', sellerName),
                                   const SizedBox(height: 6),
                                   _sellerRow(
-                                      Icons.location_on_outlined,
-                                      'Location',
-                                      p['location'] ?? 'N/A'),
+                                      Icons.phone_outlined, 'Phone', sellerPhone),
+                                  const SizedBox(height: 6),
+                                  _sellerRow(Icons.location_on_outlined,
+                                      'Location', displayLocation),
                                 ],
                               ),
                             ),

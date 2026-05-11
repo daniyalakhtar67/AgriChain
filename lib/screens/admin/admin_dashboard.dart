@@ -101,9 +101,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 }
 
-// ══════════════════════════════════════════════
-//  SHARED BACKGROUND WIDGET
-// ══════════════════════════════════════════════
+
 class _Bg extends StatelessWidget {
   final Widget child;
   const _Bg({required this.child});
@@ -119,9 +117,6 @@ class _Bg extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════
-//  TAB 1 — USERS
-// ══════════════════════════════════════════════
 class _UsersTab extends StatefulWidget {
   final Map<String, dynamic> adminData;
   const _UsersTab({required this.adminData});
@@ -318,7 +313,6 @@ class _UsersTabState extends State<_UsersTab>
               ),
             ),
 
-            // Mini stats
             if (!isLoading)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -334,7 +328,6 @@ class _UsersTabState extends State<_UsersTab>
                 ),
               ),
 
-            // Search
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: TextField(
@@ -360,7 +353,6 @@ class _UsersTabState extends State<_UsersTab>
 
             const SizedBox(height: 10),
 
-            // Tab bar
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
@@ -571,7 +563,6 @@ class _UsersTabState extends State<_UsersTab>
                     ),
                   ),
 
-                  // Action buttons
                   Container(
                     decoration: BoxDecoration(
                         border: Border(
@@ -677,7 +668,7 @@ class _UsersTabState extends State<_UsersTab>
   }
 }
 
-// ── User Detail Bottom Sheet ──
+// user tab
 class _UserDetailSheet extends StatelessWidget {
   final Map<String, dynamic> user;
   final String table;
@@ -750,10 +741,7 @@ class _UserDetailSheet extends StatelessWidget {
     );
   }
 }
-
-// ══════════════════════════════════════════════
-//  TAB 2 — STATS
-// ══════════════════════════════════════════════
+// Stat Ta
 class _StatsTab extends StatefulWidget {
   const _StatsTab();
   @override
@@ -777,7 +765,6 @@ class _StatsTabState extends State<_StatsTab> {
   Future<void> _fetchStats() async {
     setState(() => isLoading = true);
     try {
-      // ── Use correct tables & columns ──────────────────────────
       final b = await supabase
           .from('buyers')
           .select('user_id');
@@ -793,8 +780,7 @@ class _StatsTabState extends State<_StatsTab> {
       final o = await supabase
           .from('orders')
           .select('order_id, status');
-      // Verified users count from users table
-      final v = await supabase
+      final v = await supabase // for verified
           .from('users')
           .select('user_id')
           .eq('is_verified', true);
@@ -807,7 +793,6 @@ class _StatsTabState extends State<_StatsTab> {
         totalShopkeepers = (s as List).length;
         totalProducts    = (p as List).length;
         totalOrders      = orders.length;
-        // DB status values: 'placed','processing','shipped','delivered','cancelled'
         pendingOrders    = orders.where((x) =>
         x['status'] == 'placed' || x['status'] == 'processing').length;
         doneOrders       = orders.where((x) =>

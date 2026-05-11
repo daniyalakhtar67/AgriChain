@@ -8,10 +8,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-// ─────────────────────────────────────────────
-// CONSTANTS
-// ─────────────────────────────────────────────
-// Categories match the categories table
 const _kCategoryNames = [
   'Crops',
   'Fruits',
@@ -99,11 +95,8 @@ String _buildPaymentString(List<_SelectedPayment> selected) {
   return selected.map((s) => s.toDisplay()).join(' | ');
 }
 
-// ─────────────────────────────────────────────
-// MAIN DASHBOARD
-// ─────────────────────────────────────────────
 class ShopkeeperDashboard extends StatefulWidget {
-  final String userId;      // NEW: users.user_id (UUID)
+  final String userId;
   final String shopkeeperName;
 
   const ShopkeeperDashboard({
@@ -132,7 +125,6 @@ class _ShopkeeperDashboardState extends State<ShopkeeperDashboard> {
     _loadProfile();
   }
 
-  // Load full profile from users + shopkeepers
   Future<void> _loadProfile() async {
     try {
       final user = await supabase
@@ -234,10 +226,6 @@ class _ShopkeeperDashboardState extends State<ShopkeeperDashboard> {
   }
 }
 
-// ─────────────────────────────────────────────
-// TAB 1 — SELL ITEMS
-// Now uses: items + products tables (and categories for category_id lookup)
-// ─────────────────────────────────────────────
 class _SellItemsTab extends StatefulWidget {
   final String userId;
   final String shopkeeperName;
@@ -278,7 +266,6 @@ class _SellItemsTabState extends State<_SellItemsTab> {
     }
   }
 
-  // Fetch this shopkeeper's items via view_shopkeeper_items
   Future<void> fetchMyItems() async {
     setState(() => isLoading = true);
     try {
@@ -298,7 +285,6 @@ class _SellItemsTabState extends State<_SellItemsTab> {
     }
   }
 
-  // Delete: remove from items table (cascades to products)
   Future<void> deleteItem(String itemId) async {
     try {
       await supabase.from('items').delete().eq('item_id', itemId);
@@ -324,7 +310,7 @@ class _SellItemsTabState extends State<_SellItemsTab> {
     final titleC    = TextEditingController();
     final priceC    = TextEditingController();
     final descC     = TextEditingController();
-    final quantityC = TextEditingController(); // display quantity e.g. "20 pieces"
+    final quantityC = TextEditingController();
     final imageC    = TextEditingController();
     final stockC    = TextEditingController();
     final expiryC   = TextEditingController();
@@ -491,7 +477,6 @@ class _SellItemsTabState extends State<_SellItemsTab> {
 
                   final itemId = itemInsert['item_id'];
 
-                  // Step 2: products table mein insert
                   await supabase.from('products').insert({
                     'item_id':        itemId,
                     'user_id':        widget.userId,
@@ -742,9 +727,6 @@ class _SellItemsTabState extends State<_SellItemsTab> {
   }
 }
 
-// ─────────────────────────────────────────────
-// PAYMENT METHOD PICKER (unchanged logic)
-// ─────────────────────────────────────────────
 class _PaymentMethodPicker extends StatefulWidget {
   final List<_SelectedPayment> selected;
   final VoidCallback onChanged;
@@ -877,9 +859,6 @@ class _PaymentMethodPickerState extends State<_PaymentMethodPicker> {
   }
 }
 
-// ─────────────────────────────────────────────
-// ITEM CARD
-// ─────────────────────────────────────────────
 class _ItemCard extends StatelessWidget {
   final Map<String, dynamic> item;
   final VoidCallback onDelete;
@@ -1037,10 +1016,6 @@ class _ItemCard extends StatelessWidget {
       child: const Icon(Icons.image, color: Colors.white38));
 }
 
-// ─────────────────────────────────────────────
-// ITEM DETAIL SCREEN
-// Stock update: products table via item_id
-// ─────────────────────────────────────────────
 class _ShopkeeperItemDetail extends StatefulWidget {
   final Map<String, dynamic> item;
   const _ShopkeeperItemDetail({required this.item});
@@ -1395,7 +1370,6 @@ class _ShopkeeperItemDetailState extends State<_ShopkeeperItemDetail> {
                         ),
                         const SizedBox(height: 16),
 
-                        // Stock Management
                         ClipRRect(
                           borderRadius: BorderRadius.circular(14),
                           child: BackdropFilter(
@@ -1574,10 +1548,6 @@ class _ShopkeeperItemDetailState extends State<_ShopkeeperItemDetail> {
   }
 }
 
-// ─────────────────────────────────────────────
-// TAB 2 — ORDERS
-// Now uses: view_orders + order_items joined
-// ─────────────────────────────────────────────
 class _OrdersTab extends StatefulWidget {
   final String userId;
   final String shopkeeperName;
@@ -1600,8 +1570,6 @@ class _OrdersTabState extends State<_OrdersTab> {
     fetchOrders();
   }
 
-  // Fetch orders where order has items belonging to this shopkeeper
-  // Uses orders + order_items + items to match this shopkeeper's user_id
   Future<void> fetchOrders() async {
     setState(() => isLoading = true);
     try {
@@ -1624,14 +1592,12 @@ class _OrdersTabState extends State<_OrdersTab> {
         return;
       }
 
-      // Get full order details via view_orders
       final ordersData = await supabase
           .from('view_orders')
           .select()
           .inFilter('order_id', orderIds)
           .order('order_date', ascending: false);
 
-      // For each order, get its items (filtered to this shopkeeper)
       final List<Map<String, dynamic>> enriched = [];
       for (final o in ordersData as List) {
         final oi = await supabase
@@ -2151,7 +2117,6 @@ class _OrderCard extends StatelessWidget {
             ),
           ),
 
-          // Actions
           if (!isCancelled)
             Container(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
@@ -2282,10 +2247,6 @@ class _OrderCard extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────
-// TAB 3 — PROFILE
-// Now saves to users table via user_id
-// ─────────────────────────────────────────────
 class _ProfileTab extends StatelessWidget {
   final String userId;
   final String shopkeeperName;

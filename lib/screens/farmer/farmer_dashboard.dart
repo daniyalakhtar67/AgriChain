@@ -23,7 +23,6 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
   final supabase = Supabase.instance.client;
   final searchController = TextEditingController();
 
-  // ── FIX 1: mutable copy of farmerName so UI can update after edit ──
   late String _farmerName;
 
   List<Map<String, dynamic>> allProducts = [];
@@ -36,9 +35,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
   @override
   void initState() {
     super.initState();
-    // ── FIX 1: initialise mutable name from widget param ──
-    _farmerName = widget.farmerName;
-
+    _farmerName = widget.farmerName.trim(); // ── FIX: trim on init ──
     fetchShopkeeperProducts();
     searchController.addListener(_onSearch);
     _reloadCrops();
@@ -50,15 +47,45 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
     super.dispose();
   }
 
+  // ── FIX: Query by user_id (from session) instead of name ──
+  // This avoids case/space mismatch issues entirely
   void _reloadCrops() {
     setState(() {
-      _cropsFuture = supabase
+      _cropsFuture = _fetchCropsByUserId();
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchCropsByUserId() async {
+    try {
+      // ── FIX: use UserSession.id for reliable filtering ──
+      final userId = UserSession.id;
+      debugPrint('🌾 Fetching crops for user_id: $userId, name: $_farmerName');
+
+      if (userId == null || userId.toString().isEmpty) {
+        // Fallback: try by name (trimmed)
+        debugPrint('⚠️ No user_id in session, falling back to name filter');
+        final data = await supabase
+            .from('view_farmer_items')
+            .select()
+            .eq('seller_name', _farmerName)
+            .order('listed_date', ascending: false);
+        debugPrint('📦 Crops by name fallback: ${data.length} found');
+        return List<Map<String, dynamic>>.from(data);
+      }
+
+      // ── FIX: filter by user_id column (added to view_farmer_items) ──
+      final data = await supabase
           .from('view_farmer_items')
           .select()
-          .eq('seller_name', _farmerName)           // ── uses mutable name ──
-          .order('listed_date', ascending: false)
-          .then((data) => List<Map<String, dynamic>>.from(data));
-    });
+          .eq('user_id', userId)
+          .order('listed_date', ascending: false);
+
+      debugPrint('📦 Crops fetched: ${data.length}');
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      debugPrint('❌ _fetchCropsByUserId error: $e');
+      return [];
+    }
   }
 
   Future<void> fetchShopkeeperProducts() async {
@@ -383,6 +410,19 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                           child: CircularProgressIndicator(
                               color: Colors.green));
                     }
+
+                    // ── FIX: surface errors in UI during development ──
+                    if (snapshot.hasError) {
+                      debugPrint('❌ FutureBuilder error: ${snapshot.error}');
+                      return Center(
+                        child: Text(
+                          'Error loading crops:\n${snapshot.error}',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.poppins(color: Colors.redAccent),
+                        ),
+                      );
+                    }
+
                     final crops = snapshot.data ?? [];
                     if (crops.isEmpty) {
                       return Center(
@@ -392,116 +432,119 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                             style: GoogleFonts.poppins(color: Colors.white70),
                           ));
                     }
-                    return ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: crops.length,
-                      itemBuilder: (context, index) {
-                        final crop = crops[index];
+                    return RefreshIndicator(
+                      onRefresh: () async => _reloadCrops(),
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: crops.length,
+                        itemBuilder: (context, index) {
+                          final crop = crops[index];
 
-                        final qtyRaw = crop['quantity']?.toString() ?? '0';
-                        final kgVal = double.tryParse(
-                            qtyRaw.replaceAll(RegExp(r'[^0-9.]'), '')) ??
-                            0.0;
-                        final bool hasStock = kgVal > 0;
+                          final qtyRaw = crop['quantity']?.toString() ?? '0';
+                          final kgVal = double.tryParse(
+                              qtyRaw.replaceAll(RegExp(r'[^0-9.]'), '')) ??
+                              0.0;
+                          final bool hasStock = kgVal > 0;
 
-                        return GestureDetector(
-                          onTap: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => CropDetailScreen(crop: crop),
+                          return GestureDetector(
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => CropDetailScreen(crop: crop),
+                                ),
+                              );
+                              _reloadCrops();
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.white24),
                               ),
-                            );
-                            _reloadCrops();
-                          },
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.white24),
-                            ),
-                            child: ListTile(
-                              leading: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: crop['image_url'] != null
-                                    ? CachedNetworkImage(
-                                    imageUrl: crop['image_url'],
-                                    width: 55,
-                                    height: 55,
-                                    fit: BoxFit.cover,
-                                    errorWidget: (_, __, ___) =>
-                                    const Icon(Icons.image,
-                                        color: Colors.white))
-                                    : const Icon(Icons.grass,
-                                    color: Colors.green),
-                              ),
-                              title: Text(crop['name'] ?? '',
-                                  style: GoogleFonts.poppins(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold)),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                      '${crop['category_name'] ?? ''} • Rs. ${crop['price'] ?? ''}',
-                                      style: GoogleFonts.poppins(
-                                          color: Colors.white70,
-                                          fontSize: 12)),
-                                  const SizedBox(height: 4),
-                                  if (crop['payment_method'] != null &&
-                                      crop['payment_method']
-                                          .toString()
-                                          .isNotEmpty)
-                                    Padding(
-                                      padding:
-                                      const EdgeInsets.only(bottom: 4),
-                                      child: Text(
-                                        '💳 ${crop['payment_method']}',
+                              child: ListTile(
+                                leading: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: crop['image_url'] != null
+                                      ? CachedNetworkImage(
+                                      imageUrl: crop['image_url'],
+                                      width: 55,
+                                      height: 55,
+                                      fit: BoxFit.cover,
+                                      errorWidget: (_, __, ___) =>
+                                      const Icon(Icons.image,
+                                          color: Colors.white))
+                                      : const Icon(Icons.grass,
+                                      color: Colors.green),
+                                ),
+                                title: Text(crop['name'] ?? '',
+                                    style: GoogleFonts.poppins(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold)),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                        '${crop['category_name'] ?? ''} • Rs. ${crop['price'] ?? ''}',
                                         style: GoogleFonts.poppins(
-                                            color: Colors.lightBlueAccent,
-                                            fontSize: 11),
+                                            color: Colors.white70,
+                                            fontSize: 12)),
+                                    const SizedBox(height: 4),
+                                    if (crop['payment_method'] != null &&
+                                        crop['payment_method']
+                                            .toString()
+                                            .isNotEmpty)
+                                      Padding(
+                                        padding:
+                                        const EdgeInsets.only(bottom: 4),
+                                        child: Text(
+                                          '💳 ${crop['payment_method']}',
+                                          style: GoogleFonts.poppins(
+                                              color: Colors.lightBlueAccent,
+                                              fontSize: 11),
+                                        ),
+                                      ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: hasStock
+                                            ? Colors.green.withValues(alpha: 0.3)
+                                            : Colors.red.withValues(alpha: 0.3),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                            color: hasStock
+                                                ? Colors.greenAccent
+                                                .withValues(alpha: 0.6)
+                                                : Colors.redAccent
+                                                .withValues(alpha: 0.6)),
+                                      ),
+                                      child: Text(
+                                        hasStock
+                                            ? '📦 Available: ${kgVal.toStringAsFixed(1)} KG'
+                                            : '❌ Not Available',
+                                        style: GoogleFonts.poppins(
+                                            color: hasStock
+                                                ? Colors.greenAccent
+                                                : Colors.redAccent,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600),
                                       ),
                                     ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: hasStock
-                                          ? Colors.green.withValues(alpha: 0.3)
-                                          : Colors.red.withValues(alpha: 0.3),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                          color: hasStock
-                                              ? Colors.greenAccent
-                                              .withValues(alpha: 0.6)
-                                              : Colors.redAccent
-                                              .withValues(alpha: 0.6)),
-                                    ),
-                                    child: Text(
-                                      hasStock
-                                          ? '📦 Available: ${kgVal.toStringAsFixed(1)} KG'
-                                          : '❌ Not Available',
-                                      style: GoogleFonts.poppins(
-                                          color: hasStock
-                                              ? Colors.greenAccent
-                                              : Colors.redAccent,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.delete,
-                                    color: Colors.redAccent),
-                                onPressed: () => _deleteCrop(
-                                    crop['item_id']),
+                                  ],
+                                ),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.delete,
+                                      color: Colors.redAccent),
+                                  onPressed: () => _deleteCrop(
+                                      crop['item_id']),
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     );
                   },
                 ),
@@ -569,7 +612,6 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                   const Icon(Icons.person, color: Colors.green, size: 48),
                 ),
                 const SizedBox(height: 14),
-                // ── FIX 1: show _farmerName (mutable) instead of widget.farmerName ──
                 Text(_farmerName,
                     style: GoogleFonts.poppins(
                         fontSize: 22,
@@ -592,7 +634,6 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                           fontWeight: FontWeight.w600)),
                 ),
                 const SizedBox(height: 28),
-                // ── FIX 1: use _farmerName in info cards ──
                 _profileInfoCard(
                   icon: Icons.person_outline,
                   label: 'Name',
@@ -689,7 +730,6 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
     );
   }
 
-  // ── FIX 2: Edit profile dialog — writes to Supabase and updates UI ──
   void _showEditProfileDialog() {
     final nameC = TextEditingController(text: _farmerName);
     bool saving = false;
@@ -736,16 +776,14 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                 setDialogState(() => saving = true);
 
                 try {
-                  // ── FIX 2: update the users table in Supabase ──
+                  // ── FIX: update by user_id (reliable), not name ──
                   await supabase
                       .from('users')
                       .update({'name': newName})
                       .eq('user_id', UserSession.id);
 
-                  // ── FIX 1+2: update mutable state so UI re-renders ──
                   if (mounted) {
-                    setState(() => _farmerName = newName);
-                    // also reload crops query which uses _farmerName
+                    setState(() => _farmerName = newName.trim());
                     _reloadCrops();
                   }
 
@@ -759,6 +797,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                     );
                   }
                 } catch (e) {
+                  debugPrint('❌ Edit profile error: $e');
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -856,11 +895,10 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                 onPressed: saving
                     ? null
                     : () async {
-                  if (titleC.text.isEmpty || priceC.text.isEmpty) {
+                  if (titleC.text.trim().isEmpty || priceC.text.trim().isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                            content:
-                            Text('Name aur Price zaroor bharo!'),
+                            content: Text('Name aur Price zaroor bharo!'),
                             backgroundColor: Colors.red));
                     return;
                   }
@@ -889,17 +927,15 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                   }
 
                   setS(() => saving = true);
-                  try {
-                    final userRes = await supabase
-                        .from('users')
-                        .select('user_id')
-                        .eq('name', _farmerName)     // ── uses mutable name ──
-                        .maybeSingle();
 
-                    if (userRes == null) {
-                      throw Exception('Farmer user not found');
+                  try {
+                    // ── FIX: use UserSession.id directly — no name lookup needed ──
+                    final userId = UserSession.id;
+                    debugPrint('🌱 Adding crop for user_id: $userId');
+
+                    if (userId == null || userId.toString().isEmpty) {
+                      throw Exception('User session expired. Please login again.');
                     }
-                    final userId = userRes['user_id'];
 
                     final catRes = await supabase
                         .from('categories')
@@ -908,6 +944,10 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                         .maybeSingle();
 
                     final categoryId = catRes?['category_id'];
+                    debugPrint('📂 Category ID: $categoryId');
+
+                    final qtyText = quantityKgC.text.trim();
+                    final qtyNum  = double.tryParse(qtyText) ?? 0.0;
 
                     final itemRes = await supabase
                         .from('items')
@@ -916,15 +956,12 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                       'category_id': categoryId,
                       'name'       : titleC.text.trim(),
                       'description': descC.text.trim(),
-                      'price'      : double.tryParse(
-                          priceC.text.trim()) ??
-                          0,
+                      'price'      : double.tryParse(priceC.text.trim()) ?? 0,
                       'price_unit' : 'per kg',
                       'unit'       : 'kg',
-                      'quantity'   :
-                      '${quantityKgC.text.trim()} kg',
-                      'image_url'  :
-                      imageC.text.trim().isEmpty
+                      // ── FIX: always store as "<number> kg" format ──
+                      'quantity'   : '${qtyNum.toStringAsFixed(0)} kg',
+                      'image_url'  : imageC.text.trim().isEmpty
                           ? null
                           : imageC.text.trim(),
                       'status'     : 'active',
@@ -933,12 +970,15 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                         .single();
 
                     final itemId = itemRes['item_id'];
+                    debugPrint('✅ Item inserted: $itemId');
 
                     await supabase.from('crops').insert({
                       'item_id'  : itemId,
                       'user_id'  : userId,
                       'crop_type': titleC.text.trim(),
                     });
+
+                    debugPrint('✅ Crop row inserted');
 
                     for (final c in accControllers.values) {
                       c.dispose();
@@ -953,11 +993,14 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
                               backgroundColor: Colors.green));
                     }
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text('Error: $e'),
-                        backgroundColor: Colors.red));
+                    debugPrint('❌ Add crop error: $e');
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text('Error: $e'),
+                          backgroundColor: Colors.red));
+                    }
                   }
-                  setS(() => saving = false);
+                  if (mounted) setS(() => saving = false);
                 },
                 child: saving
                     ? const SizedBox(
@@ -977,6 +1020,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
 
   Future<void> _deleteCrop(dynamic itemId) async {
     try {
+      debugPrint('🗑️ Deleting crop item_id: $itemId');
       await supabase.from('items').delete().eq('item_id', itemId);
       _reloadCrops();
       if (mounted) {
@@ -984,6 +1028,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> {
             content: Text('Crop Deleted!'), backgroundColor: Colors.red));
       }
     } catch (e) {
+      debugPrint('❌ Delete crop error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text('Error: $e'), backgroundColor: Colors.red));
@@ -1045,7 +1090,6 @@ class _ProductCardState extends State<_ProductCard> {
   String get _location => widget.product['seller_location'] ?? '';
   String get _category => widget.product['category_name']  ?? '';
   String get _imageUrl => widget.product['image_url']      ?? '';
-  String get _seller   => widget.product['seller_name']    ?? '';
 
   dynamic get _rawItemId => widget.product['item_id'];
 
